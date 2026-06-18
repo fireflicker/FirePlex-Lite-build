@@ -913,14 +913,14 @@ fun FirePlexApp(repo: PlexRepository) {
         }
     }
 
-    fun openPlayer(item: PlexMediaItem, subtitle: PlexSubtitleTrack?) {
+    fun openPlayer(item: PlexMediaItem, subtitle: PlexSubtitleTrack?, fromStart: Boolean = false) {
         selectedItem = item
         selectedSubtitle = subtitle
         playUrl = null
         selectedSubtitleUrl = null
         externalSubtitleUrl = null
         externalSubtitleName = null
-        currentPlaybackPositionMs = item.viewOffsetMs
+        currentPlaybackPositionMs = if (fromStart) 0L else item.viewOffsetMs
         playerError = null
         playerRetryInProgress = false
 
@@ -1161,15 +1161,8 @@ fun FirePlexApp(repo: PlexRepository) {
         }
     }
 
-    val backgroundArt = remember(backdropUrls, artworkUrls, recentlyMovies, recentlyShows, continueWatching, selectedDetailItem, selectedShow, selectedSeason) {
-        selectedDetailItem?.let { backdropUrls[it.ratingKey] ?: artworkUrls[it.ratingKey] }
-            ?: selectedSeason?.let { backdropUrls[it.ratingKey] ?: artworkUrls[it.ratingKey] }
-            ?: selectedShow?.let { backdropUrls[it.ratingKey] ?: artworkUrls[it.ratingKey] }
-            ?: recentlyMovies.firstOrNull()?.let { backdropUrls[it.ratingKey] ?: artworkUrls[it.ratingKey] }
-            ?: continueWatching.firstOrNull()?.let { backdropUrls[it.ratingKey] ?: artworkUrls[it.ratingKey] }
-            ?: recentlyShows.firstOrNull()?.let { backdropUrls[it.ratingKey] ?: artworkUrls[it.ratingKey] }
-            ?: ""
-    }
+    // Keep the main menus clean and fast: no rotating video/backdrop backgrounds.
+    val backgroundArt = ""
 
     val systemDensity = LocalDensity.current
     val compactScale = if (appDisplayMode == AppDisplayMode.Mobile) 0.90f else 0.82f
@@ -1178,7 +1171,7 @@ fun FirePlexApp(repo: PlexRepository) {
     }
 
     CompositionLocalProvider(LocalDensity provides compactDensity) {
-    MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFFE5A00D))) {
+    MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFF00E676))) {
         if (!appDisplayModeLoaded) {
             Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
                 Text("Loading FirePlex layout...", color = Color.White, fontSize = 20.sp)
@@ -1263,7 +1256,7 @@ fun FirePlexApp(repo: PlexRepository) {
                     .background(Color(0x99000000))
             )
 
-            if (backgroundArt.isNotBlank() && !needsAppLogin) {
+            if (false && backgroundArt.isNotBlank() && !needsAppLogin) {
                 AsyncImage(
                     model = cachedImageModel(backgroundArt),
                     contentDescription = null,
@@ -1314,7 +1307,7 @@ fun FirePlexApp(repo: PlexRepository) {
                             artworkUrl = artworkUrls[selectedDetailItem!!.ratingKey].orEmpty(),
                             backdropUrl = backdropUrls[selectedDetailItem!!.ratingKey].orEmpty(),
                             playerChoice = preferredPlayer,
-                            onPlay = { item, subtitle -> openPlayer(item, subtitle) }
+                            onPlay = { item, subtitle, fromStart -> openPlayer(item, subtitle, fromStart) }
                         )
                     }
 
@@ -1359,7 +1352,8 @@ fun FirePlexApp(repo: PlexRepository) {
                             artworkStatus = updateArtworkStatus,
                             cachedAt = cachedAt,
                             onStartUpdate = { updateContent() },
-                            onClearCache = { clearContentCache() }
+                            onClearCache = { clearContentCache() },
+                            onBack = { showUpdateScreen = false }
                         )
                     }
 
@@ -1552,7 +1546,7 @@ fun AppLoginScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text("FirePlex3.0", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text("Player account", color = Color(0xFFE5A00D), fontSize = 16.sp)
+        Text("Player account", color = Color(0xFF00E676), fontSize = 16.sp)
         Spacer(Modifier.height(16.dp))
 
         Card(
@@ -1583,9 +1577,8 @@ fun AppLoginScreen(
                 Text(message, color = Color(0xFF4DFF9B), textAlign = TextAlign.Center)
                 Spacer(Modifier.height(24.dp))
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = onContinue, enabled = !loading) { Text(if (loading) "Checking..." else "Continue") }
-                    OutlinedButton(onClick = onRelinkPlex, enabled = !loading) { Text("Relink Plex") }
+                Button(onClick = onContinue, enabled = !loading, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (loading) "Checking..." else "Continue")
                 }
             }
         }
@@ -1618,7 +1611,7 @@ fun LinkScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text("FirePlex3.0", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text("Your Plex player", color = Color(0xFFE5A00D), fontSize = 16.sp)
+        Text("Your Plex player", color = Color(0xFF00E676), fontSize = 16.sp)
         Spacer(Modifier.height(16.dp))
 
         Card(modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xF2111820)), shape = RoundedCornerShape(24.dp)) {
@@ -1627,7 +1620,7 @@ fun LinkScreen(
                 Spacer(Modifier.height(14.dp))
 
                 Box(modifier = Modifier.background(Color(0xFF1A2028), RoundedCornerShape(18.dp)).padding(horizontal = 36.dp, vertical = 18.dp), contentAlignment = Alignment.Center) {
-                    Text(text = codeText.ifBlank { "----" }, color = Color(0xFFE5A00D), fontSize = 44.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 6.sp)
+                    Text(text = codeText.ifBlank { "----" }, color = Color(0xFF00E676), fontSize = 44.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 6.sp)
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -1688,7 +1681,7 @@ fun DisplayModeChooserScreen(
             )
             Spacer(Modifier.height(if (landscape) 8.dp else 14.dp))
             Text("FirePlex4.0", color = Color.White, fontSize = titleSize, fontWeight = FontWeight.Bold)
-            Text("Choose how you are using the app", color = Color(0xFFE5A00D), fontSize = if (landscape) 14.sp else 17.sp)
+            Text("Choose how you are using the app", color = Color(0xFF00E676), fontSize = if (landscape) 14.sp else 17.sp)
             Spacer(Modifier.height(if (landscape) 18.dp else 34.dp))
 
             if (landscape) {
@@ -1751,7 +1744,7 @@ fun DisplayModeTile(
             .focusable()
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF203040) else Color(0xE90B0D25)),
-        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFFE5A00D) else Color(0x44FFFFFF)),
+        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFF00E676) else Color(0x44FFFFFF)),
         shape = RoundedCornerShape(24.dp)
     ) {
         Column(
@@ -1759,7 +1752,7 @@ fun DisplayModeTile(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(icon, color = Color(0xFFE5A00D), fontSize = 48.sp, fontWeight = FontWeight.Bold)
+            Text(icon, color = Color(0xFF00E676), fontSize = 48.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Text(title, color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -1800,7 +1793,7 @@ fun MobileLobbyScreen(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("FirePlex4.0", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                     Text("$serverName - $friendlyName", color = Color(0xFFB7C7D8), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(cacheLabel(cachedAt), color = Color(0xFFE5A00D), fontSize = 11.sp)
+                    Text(cacheLabel(cachedAt), color = Color(0xFF00E676), fontSize = 11.sp)
                 }
             }
         }
@@ -1911,9 +1904,9 @@ fun MobileContentBrowseScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text(cacheLabel(cachedAt), color = Color(0xFFE5A00D), fontSize = 11.sp)
+            Text(cacheLabel(cachedAt), color = Color(0xFF00E676), fontSize = 11.sp)
         }
-        Text(selectedCategoryTitle, color = Color(0xFFE5A00D), fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(selectedCategoryTitle, color = Color(0xFF00E676), fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(8.dp))
 
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -2000,7 +1993,7 @@ fun FavoritesScreen(
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Text("FAVOURITES", color = Color.White, fontSize = if (mobileMode) 28.sp else 38.sp, fontWeight = FontWeight.Bold)
-        Text("Hold a poster again to remove it from favourites.", color = Color(0xFFE5A00D), fontSize = 13.sp)
+        Text("Hold a poster again to remove it from favourites.", color = Color(0xFF00E676), fontSize = 13.sp)
         Spacer(Modifier.height(10.dp))
         Text(if (loading) "Loading..." else status, color = Color(0xFFB7C7D8), fontSize = 13.sp)
         Spacer(Modifier.height(14.dp))
@@ -2043,8 +2036,8 @@ fun MobileCategoryChip(text: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.clickable { onClick() },
         shape = RoundedCornerShape(20.dp),
-        color = if (selected) Color(0xFFE5A00D) else Color(0xCC111820),
-        border = BorderStroke(1.dp, if (selected) Color(0xFFE5A00D) else Color(0x44FFFFFF))
+        color = if (selected) Color(0xFF00E676) else Color(0xCC111820),
+        border = BorderStroke(1.dp, if (selected) Color(0xFF00E676) else Color(0x44FFFFFF))
     ) {
         Text(
             text = text,
@@ -2091,7 +2084,7 @@ fun MobilePosterCard(
                     Text(
                         "★",
                         modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
-                        color = Color(0xFFE5A00D),
+                        color = Color(0xFF00E676),
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -2139,7 +2132,7 @@ fun LobbyScreen(
                     Column {
                         Text("FirePlex3.0", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                         Text("$serverName - $friendlyName", color = Color(0xFFB7C7D8), fontSize = 13.sp)
-                        Text(cacheLabel(cachedAt), color = Color(0xFFE5A00D), fontSize = 12.sp)
+                        Text(cacheLabel(cachedAt), color = Color(0xFF00E676), fontSize = 12.sp)
                     }
                 }
 
@@ -2210,7 +2203,7 @@ fun TvHomeScreen(
                 Column {
                     Text("FirePlex", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
                     Text("$serverName  •  $friendlyName", color = Color(0xFFB7C7D8), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(cacheLabel(cachedAt), color = Color(0xFFE5A00D), fontSize = 12.sp)
+                    Text(cacheLabel(cachedAt), color = Color(0xFF00E676), fontSize = 12.sp)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -2232,21 +2225,13 @@ fun TvHomeScreen(
         Text(if (loading) "Loading..." else status, color = Color(0xFFB7C7D8), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(14.dp))
 
-        LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            if (continueWatching.isNotEmpty()) {
-                item { TvPosterRow("CONTINUE WATCHING", continueWatching, artworkUrls, favoriteKeys, onSelectDetails, onToggleFavorite) }
-            }
-            if (recentlyMovies.isNotEmpty()) {
-                item { TvPosterRow("RECENTLY ADDED MOVIES", recentlyMovies.take(24), artworkUrls, favoriteKeys, onSelectDetails, onToggleFavorite) }
-            }
-            if (recentlyShows.isNotEmpty()) {
-                item { TvPosterRow("RECENTLY ADDED SERIES", recentlyShows.take(24), artworkUrls, favoriteKeys, onSelectDetails, onToggleFavorite) }
-            }
-            if (favoriteItems.isNotEmpty()) {
-                item { TvPosterRow("FAVOURITES", favoriteItems.take(24), artworkUrls, favoriteKeys, onSelectDetails, onToggleFavorite) }
-            }
-            item { Spacer(Modifier.height(18.dp)) }
-        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Use VOD, Series, Favourites, or Search to browse. Continue Watching appears on item pages when progress exists.",
+            color = Color(0xFFB7C7D8),
+            fontSize = 14.sp
+        )
+        Spacer(Modifier.weight(1f))
     }
 }
 
@@ -2267,11 +2252,11 @@ fun TvQuickTile(
             .focusable(enabled)
             .clickable(enabled = enabled) { onClick() },
         colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF26384A) else Color(0xE9111820)),
-        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFFE5A00D) else Color(0x33FFFFFF)),
+        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFF00E676) else Color(0x33FFFFFF)),
         shape = RoundedCornerShape(18.dp)
     ) {
         Row(modifier = Modifier.fillMaxSize().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(icon, color = if (enabled) Color(0xFFE5A00D) else Color(0xFF6D7785), fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            Text(icon, color = if (enabled) Color(0xFF00E676) else Color(0xFF6D7785), fontSize = 30.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(title, color = if (enabled) Color.White else Color(0xFF6D7785), fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -2398,7 +2383,7 @@ fun ContentBrowseScreen(
             item {
                 Column {
                     Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text(cacheLabel(cachedAt), color = Color(0xFFE5A00D), fontSize = 10.sp)
+                    Text(cacheLabel(cachedAt), color = Color(0xFF00E676), fontSize = 10.sp)
                     Spacer(Modifier.height(6.dp))
                 }
             }
@@ -2443,7 +2428,7 @@ fun ContentBrowseScreen(
                 } else {
                     Column {
                         Text(selectedCategoryTitle, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Light)
-                        Text("CATEGORIES", color = Color(0xFFE5A00D), fontSize = 11.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                        Text("CATEGORIES", color = Color(0xFF00E676), fontSize = 11.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -2501,7 +2486,7 @@ fun LoadingMoreTile() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            CircularProgressIndicator(color = Color(0xFFE5A00D), modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+            CircularProgressIndicator(color = Color(0xFF00E676), modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
             Spacer(Modifier.height(10.dp))
             Text("Loading more...", color = Color.White, fontSize = 13.sp, textAlign = TextAlign.Center)
         }
@@ -2521,13 +2506,13 @@ fun VodSeriesMenuItem(text: String, selected: Boolean, onClick: () -> Unit) {
             .focusable()
             .clickable { onClick() },
         color = if (active) Color(0x3329D3FF) else Color.Transparent,
-        border = if (focused) BorderStroke(2.dp, Color(0xFFE5A00D)) else null,
+        border = if (focused) BorderStroke(2.dp, Color(0xFF00E676)) else null,
         shape = RoundedCornerShape(4.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = text,
-                color = if (active) Color(0xFFE5A00D) else Color.White,
+                color = if (active) Color(0xFF00E676) else Color.White,
                 fontSize = if (active) 16.sp else 15.sp,
                 fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 2,
@@ -2550,7 +2535,8 @@ fun UpdateContentsScreen(
     artworkStatus: String,
     cachedAt: Long,
     onStartUpdate: () -> Unit,
-    onClearCache: () -> Unit
+    onClearCache: () -> Unit,
+    onBack: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Update Media Contents", color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.Light, letterSpacing = 6.sp)
@@ -2572,11 +2558,14 @@ fun UpdateContentsScreen(
         }
 
         Spacer(Modifier.weight(1f))
-        Text(cacheLabel(cachedAt), color = Color(0xFFE5A00D), fontSize = 13.sp)
+        Text(cacheLabel(cachedAt), color = Color(0xFF00E676), fontSize = 13.sp)
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(onClick = onClearCache, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8E0031))) { Text("CLEAR CACHE") }
             Button(onClick = onStartUpdate, enabled = !loading, modifier = Modifier.weight(2f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007C86))) { Text(if (loading) "PLEASE WAIT..." else "START UPDATE") }
+            if (!loading && (vodStatus == "Completed" || seriesStatus == "Completed" || artworkStatus.contains("cached", true))) {
+                Button(onClick = onBack, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676))) { Text("BACK") }
+            }
         }
     }
 }
@@ -2585,7 +2574,7 @@ fun UpdateContentsScreen(
 fun LobbyCircleTile(label: String, icon: String, enabled: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val borderColor = when {
-        focused -> Color(0xFFE5A00D)
+        focused -> Color(0xFF00E676)
         enabled -> Color(0x99FFFFFF)
         else -> Color(0x44FFFFFF)
     }
@@ -2617,8 +2606,8 @@ fun LobbySmallButton(text: String, onClick: () -> Unit) {
             .focusable()
             .clickable { onClick() },
         shape = RoundedCornerShape(6.dp),
-        color = if (focused) Color(0xFFE5A00D) else Color.Transparent,
-        border = BorderStroke(1.dp, if (focused) Color(0xFFE5A00D) else Color.White)
+        color = if (focused) Color(0xFF00E676) else Color.Transparent,
+        border = BorderStroke(1.dp, if (focused) Color(0xFF00E676) else Color.White)
     ) {
         Text(
             text,
@@ -2641,7 +2630,7 @@ fun ContentSideRail(
     Card(modifier = Modifier.width(250.dp).fillMaxHeight(), colors = CardDefaults.cardColors(containerColor = Color(0xE6111820)), shape = RoundedCornerShape(8.dp)) {
         LazyColumn(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item { Text(title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold) }
-            item { Text("Categories", color = Color(0xFFE5A00D), fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+            item { Text("Categories", color = Color(0xFF00E676), fontSize = 14.sp, fontWeight = FontWeight.Bold) }
             item { MenuButton("Recently Added") { } }
             items(libraries, key = { it.key }) { library ->
                 MenuButton(library.title.ifBlank { "Library" }) { onOpenLibrary(library) }
@@ -2657,8 +2646,8 @@ fun ContentSideRail(
 fun ModeChip(text: String, selected: Boolean) {
     Surface(
         shape = RoundedCornerShape(28.dp),
-        color = if (selected) Color(0xFFE5A00D) else Color(0x66111820),
-        border = BorderStroke(1.dp, if (selected) Color(0xFFE5A00D) else Color(0x99FFFFFF))
+        color = if (selected) Color(0xFF00E676) else Color(0x66111820),
+        border = BorderStroke(1.dp, if (selected) Color(0xFF00E676) else Color(0x99FFFFFF))
     ) {
         Text(
             text,
@@ -2704,7 +2693,7 @@ fun LeftMenu(
             item { MenuButton("Settings", onOpenSettings) }
             item {
                 Spacer(Modifier.height(8.dp))
-                Text("Categories", color = Color(0xFFE5A00D), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Categories", color = Color(0xFF00E676), fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
             items(libraries, key = { it.key }) { library ->
                 MenuButton(library.title.ifBlank { "Library" }) { onOpenLibrary(library) }
@@ -2717,7 +2706,7 @@ fun LeftMenu(
 fun MenuButton(text: String, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val bg = if (focused) Color(0x3329D3FF) else Color.Transparent
-    val fg = if (focused) Color(0xFFE5A00D) else Color.White
+    val fg = if (focused) Color(0xFF00E676) else Color.White
 
     Text(
         text = text,
@@ -2807,7 +2796,7 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Light,
                             letterSpacing = 8.sp
                         )
-                        Text(status, color = Color(0xFFE5A00D), fontSize = 14.sp)
+                        Text(status, color = Color(0xFF00E676), fontSize = 14.sp)
                         Text(cacheLabel(cachedAt), color = Color(0xFFB7C7D8), fontSize = 12.sp)
                     }
 
@@ -2856,8 +2845,8 @@ fun SettingsScreen(
                         Text("Choose the layout for this device. TV mode is best for Google TV, Android TV boxes, and Fire Sticks.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
                         Spacer(Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                            FocusActionButton("TV / REMOTE", Modifier.weight(1f), if (appDisplayMode == AppDisplayMode.Tv) Color(0xFFE5A00D) else Color(0xFF203040)) { onSaveAppDisplayMode(AppDisplayMode.Tv) }
-                            FocusActionButton("MOBILE / TOUCH", Modifier.weight(1f), if (appDisplayMode == AppDisplayMode.Mobile) Color(0xFFE5A00D) else Color(0xFF203040)) { onSaveAppDisplayMode(AppDisplayMode.Mobile) }
+                            FocusActionButton("TV / REMOTE", Modifier.weight(1f), if (appDisplayMode == AppDisplayMode.Tv) Color(0xFF00E676) else Color(0xFF203040)) { onSaveAppDisplayMode(AppDisplayMode.Tv) }
+                            FocusActionButton("MOBILE / TOUCH", Modifier.weight(1f), if (appDisplayMode == AppDisplayMode.Mobile) Color(0xFF00E676) else Color(0xFF203040)) { onSaveAppDisplayMode(AppDisplayMode.Mobile) }
                         }
                     }
                 }
@@ -2909,7 +2898,7 @@ fun SettingsScreen(
                         Text("Tests the connection to your selected Plex server.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
                         Spacer(Modifier.height(16.dp))
                         Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF031C33), RoundedCornerShape(14.dp)).padding(22.dp), contentAlignment = Alignment.Center) {
-                            Text(speedResult, color = Color(0xFFE5A00D), fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                            Text(speedResult, color = Color(0xFF00E676), fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                         }
                         Spacer(Modifier.height(16.dp))
                         FocusActionButton("BEGIN SPEED TEST", Modifier.fillMaxWidth(), Color(0xFF007C86)) { onRunSpeedTest() }
@@ -2920,22 +2909,18 @@ fun SettingsScreen(
             SettingsPage.PlayerSettings -> {
                 item {
                     SettingsCard(title = "Device Profile") {
-                        Text("Auto Detect chooses a TV-safe EXO and Plex stream setup. Selecting a preset applies it immediately.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
+                        Text("Device profile is locked to Auto Detect. FirePlex will tune the player for Google TV, Fire Stick, Android TV, or mobile automatically.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
                         Spacer(Modifier.height(12.dp))
-                        SettingsOptionRow(
-                            "Profile",
-                            DeviceProfile.entries.map { it to it.label },
-                            deviceProfile
-                        ) { onSaveDeviceProfile(it) }
+                        FocusActionButton("AUTO DETECT", Modifier.fillMaxWidth(), Color(0xFF00E676)) { onSaveDeviceProfile(DeviceProfile.Auto) }
                     }
                 }
 
                 item {
                     SettingsCard(title = "Player") {
-                        Text("Selected: ${playerLabel(playerChoice)}", color = Color(0xFFE5A00D), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text("Selected: ${playerLabel(playerChoice)}", color = Color(0xFF00E676), fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(12.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                            FocusActionButton("EXO BUILT IN", Modifier.fillMaxWidth(), Color(0xFFE5A00D)) { onSavePlayerChoice(PlayerChoice.Exo) }
+                            FocusActionButton("EXO BUILT IN", Modifier.fillMaxWidth(), Color(0xFF00E676)) { onSavePlayerChoice(PlayerChoice.Exo) }
                         }
                         Spacer(Modifier.height(10.dp))
                         Text("FirePlex now uses one embedded player on every supported device.", color = Color(0xFFB7C7D8), fontSize = 12.sp)
@@ -2944,27 +2929,11 @@ fun SettingsScreen(
 
                 item {
                     SettingsCard(title = "Stream Type") {
-                        Text("Use Direct Play for normal playback. Use Direct Stream or Transcode when videos have audio sync, codec, or container problems.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
+                        Text("Auto uses Direct Play first, Direct Stream when needed, and only falls back to Transcode if playback fails.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
                         Spacer(Modifier.height(12.dp))
-                        SettingsOptionRow(
-                            "Playback Stream",
-                            listOf(
-                                "direct_play" to "Direct Play",
-                                "direct_stream" to "Direct Stream",
-                                "transcode" to "Transcode"
-                            ),
-                            streamMode
-                        ) { onSaveStreamMode(it) }
+                        FocusActionButton("AUTO: DIRECT PLAY → DIRECT STREAM → TRANSCODE", Modifier.fillMaxWidth(), Color(0xFF00E676)) { onSaveStreamMode("auto") }
                         Spacer(Modifier.height(8.dp))
-                        Text(
-                            when (streamMode) {
-                                "transcode" -> "Transcode asks Plex to convert the stream to HLS. This is the best option to try for out-of-sync sound."
-                                "direct_stream" -> "Direct Stream asks Plex to remux without fully converting where possible."
-                                else -> "Direct Play sends the original file to the embedded player."
-                            },
-                            color = Color(0xFFE5A00D),
-                            fontSize = 12.sp
-                        )
+                        Text("Current: ${streamModeLabel(streamMode)}", color = Color(0xFF00E676), fontSize = 12.sp)
                     }
                 }
 
@@ -3012,7 +2981,7 @@ fun TvSeasonsScreen(
         item {
             Column {
                 Text(show.title.ifBlank { "TV Series" }, color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.Bold)
-                Text(if (loading) "Loading seasons..." else status, color = Color(0xFFE5A00D), fontSize = 14.sp)
+                Text(if (loading) "Loading seasons..." else status, color = Color(0xFF00E676), fontSize = 14.sp)
             }
         }
 
@@ -3044,7 +3013,7 @@ fun TvEpisodesScreen(
         item {
             Column {
                 Text(show?.title?.takeIf { it.isNotBlank() } ?: "TV Series", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
-                Text(season.title.ifBlank { "Episodes" }, color = Color(0xFFE5A00D), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(season.title.ifBlank { "Episodes" }, color = Color(0xFF00E676), fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text(if (loading) "Loading episodes..." else status, color = Color(0xFFB7C7D8), fontSize = 14.sp)
             }
         }
@@ -3107,7 +3076,7 @@ fun LibraryContentScreen(
                     Text(library.title.ifBlank { "Library" }, color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
                     Text(
                         if (selectedLetter == "All") status else "Showing $selectedLetter",
-                        color = Color(0xFFE5A00D),
+                        color = Color(0xFF00E676),
                         fontSize = 14.sp
                     )
                 }
@@ -3130,7 +3099,7 @@ fun LibraryContentScreen(
 fun AlphabetButton(text: String, selected: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val bg = when {
-        focused -> Color(0xFFE5A00D)
+        focused -> Color(0xFF00E676)
         selected -> Color(0xFF284152)
         else -> Color(0xF2111820)
     }
@@ -3145,7 +3114,7 @@ fun AlphabetButton(text: String, selected: Boolean, onClick: () -> Unit) {
             .clickable { onClick() },
         color = bg,
         shape = RoundedCornerShape(10.dp),
-        border = if (focused || selected) BorderStroke(2.dp, Color(0xFFE5A00D)) else null
+        border = if (focused || selected) BorderStroke(2.dp, Color(0xFF00E676)) else null
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(text, color = fg, fontWeight = FontWeight.Bold, fontSize = 13.sp)
@@ -3163,23 +3132,18 @@ fun MediaDetailsScreen(
     artworkUrl: String,
     backdropUrl: String,
     playerChoice: PlayerChoice,
-    onPlay: (PlexMediaItem, PlexSubtitleTrack?) -> Unit
+    onPlay: (PlexMediaItem, PlexSubtitleTrack?, Boolean) -> Unit
 ) {
     var subtitle by remember(item) { mutableStateOf(item.subtitles.firstOrNull { it.selected }) }
 
     LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item {
-            Box(modifier = Modifier.fillMaxWidth().height(250.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF111820))) {
-                val hero = backdropUrl.ifBlank { artworkUrl }
-                if (hero.isNotBlank()) {
-                    AsyncImage(model = cachedImageModel(hero), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                }
-
-                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF2050608)))))
-
+            Box(modifier = Modifier.fillMaxWidth().height(210.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF111820))) {
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(22.dp)) {
                     Text(item.title.ifBlank { "Untitled" }, color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
-                    Text(mediaMetaLine(item), color = Color(0xFFE5A00D), fontSize = 14.sp)
+                    if (item.viewOffsetMs > 0L) {
+                        Text("Continue watching available", color = Color(0xFF00E676), fontSize = 14.sp)
+                    }
                 }
             }
         }
@@ -3189,36 +3153,18 @@ fun MediaDetailsScreen(
         }
 
         item {
-            SettingsCard(title = "Video Format") {
-                Text("Player: ${playerLabel(playerChoice)}", color = Color(0xFFE5A00D), fontSize = 14.sp)
-                Spacer(Modifier.height(14.dp))
-
-                Text("Subtitles", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        FilterChip(selected = subtitle == null, onClick = { subtitle = null }, label = { Text("Off") })
-                    }
-
-                    items(item.subtitles, key = { it.id.ifBlank { it.title } }) { track ->
-                        FilterChip(
-                            selected = subtitle == track,
-                            onClick = { subtitle = track },
-                            label = { Text(track.title.ifBlank { track.language.ifBlank { "Subtitle" } }) }
-                        )
-                    }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = { onPlay(item, null, false) }, modifier = Modifier.weight(1f)) {
+                    Text(if (item.viewOffsetMs > 0L) "Continue Watching" else "Play")
                 }
-
-                if (item.subtitles.isEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text("No remote subtitles found from Plex for this item.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
+                if (item.viewOffsetMs > 0L) {
+                    OutlinedButton(onClick = { onPlay(item, null, true) }, modifier = Modifier.weight(1f)) {
+                        Text("Play From Start")
+                    }
                 }
             }
-        }
-
-        item {
-            Button(onClick = { onPlay(item, subtitle) }) { Text("Play Full Screen") }
+            Spacer(Modifier.height(8.dp))
+            Text("Subtitles and audio options are inside the video player.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
         }
     }
 }
@@ -3297,7 +3243,7 @@ fun MediaPosterCard(
             .focusable()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF17222D) else Color(0xF2111820)),
-        border = if (focused) BorderStroke(3.dp, Color(0xFFE5A00D)) else null,
+        border = if (focused) BorderStroke(3.dp, Color(0xFF00E676)) else null,
         shape = RoundedCornerShape(10.dp)
     ) {
         Column {
@@ -3305,13 +3251,13 @@ fun MediaPosterCard(
                 if (artworkUrl.isNotBlank()) {
                     AsyncImage(model = cachedImageModel(artworkUrl), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
-                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = Color(0xFFE5A00D), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = Color(0xFF00E676), fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 }
                 if (isFavorite) {
                     Text(
                         "★",
                         modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
-                        color = Color(0xFFE5A00D),
+                        color = Color(0xFF00E676),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -3319,7 +3265,7 @@ fun MediaPosterCard(
             }
             Column(Modifier.padding(7.dp)) {
                 Text(item.title.ifBlank { "Untitled" }, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(mediaMetaLine(item), color = Color(0xFFE5A00D), fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(mediaMetaLine(item), color = Color(0xFF00E676), fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -3527,16 +3473,16 @@ fun LibraryPosterCard(library: PlexLibrary, onOpen: () -> Unit) {
             .focusable()
             .clickable { onOpen() },
         colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF17222D) else Color(0xF2111820)),
-        border = if (focused) BorderStroke(3.dp, Color(0xFFE5A00D)) else null,
+        border = if (focused) BorderStroke(3.dp, Color(0xFF00E676)) else null,
         shape = RoundedCornerShape(18.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF4A3208), Color(0xFF111820), Color(0xFF050608)))).padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text(library.title.ifBlank { "Library" }, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(6.dp))
-                Text(library.type.ifBlank { "category" }, color = Color(0xFFE5A00D), fontSize = 12.sp)
+                Text(library.type.ifBlank { "category" }, color = Color(0xFF00E676), fontSize = 12.sp)
             }
-            Text(if (focused) "Press OK" else "Open", color = Color(0xFFE5A00D), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(if (focused) "Press OK" else "Open", color = Color(0xFF00E676), fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -3550,7 +3496,7 @@ fun MediaWideRow(item: PlexMediaItem, artworkUrl: String, onClick: () -> Unit) {
             .onFocusChanged { focused = it.isFocused }
             .focusable(),
         colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF17222D) else Color(0xF2111820)),
-        border = if (focused) BorderStroke(3.dp, Color(0xFFE5A00D)) else null,
+        border = if (focused) BorderStroke(3.dp, Color(0xFF00E676)) else null,
         shape = RoundedCornerShape(18.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(if (focused) 18.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -3558,7 +3504,7 @@ fun MediaWideRow(item: PlexMediaItem, artworkUrl: String, onClick: () -> Unit) {
                 if (artworkUrl.isNotBlank()) {
                     AsyncImage(model = cachedImageModel(artworkUrl), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
-                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = Color(0xFFE5A00D), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = Color(0xFF00E676), fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -3566,7 +3512,7 @@ fun MediaWideRow(item: PlexMediaItem, artworkUrl: String, onClick: () -> Unit) {
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(item.title.ifBlank { "Untitled" }, color = Color.White, fontSize = if (focused) 21.sp else 19.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(mediaMetaLine(item), color = Color(0xFFE5A00D), fontSize = 13.sp)
+                Text(mediaMetaLine(item), color = Color(0xFF00E676), fontSize = 13.sp)
 
                 if (item.summary.isNotBlank()) {
                     Spacer(Modifier.height(5.dp))
@@ -3576,7 +3522,7 @@ fun MediaWideRow(item: PlexMediaItem, artworkUrl: String, onClick: () -> Unit) {
 
             if (focused) {
                 Spacer(Modifier.width(12.dp))
-                Text("OK", color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.background(Color(0xFFE5A00D), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp))
+                Text("OK", color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.background(Color(0xFF00E676), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp))
             }
         }
     }
