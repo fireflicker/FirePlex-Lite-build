@@ -125,6 +125,9 @@ fun FirePlexApp(repo: PlexRepository) {
     var libraries by remember { mutableStateOf<List<PlexLibrary>>(emptyList()) }
     var hiddenKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var mediaItems by remember { mutableStateOf<List<PlexMediaItem>>(emptyList()) }
+    var categoryMemoryCache by remember { mutableStateOf<Map<String, List<PlexMediaItem>>>(emptyMap()) }
+    var preloadingLibraryKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var libraryLoadingMore by remember { mutableStateOf(false) }
     var recentlyMovies by remember { mutableStateOf<List<PlexMediaItem>>(emptyList()) }
     var recentlyShows by remember { mutableStateOf<List<PlexMediaItem>>(emptyList()) }
     var continueWatching by remember { mutableStateOf<List<PlexMediaItem>>(emptyList()) }
@@ -309,7 +312,7 @@ fun FirePlexApp(repo: PlexRepository) {
         continueWatching = emptyList()
         hiddenKeys = repo.hiddenLibraryKeys()
 
-        val artwork = loadArtwork(recentlyMovies + recentlyShows + continueWatching)
+        val artwork = loadArtwork((recentlyMovies + recentlyShows + continueWatching).take(120))
         artworkUrls = artwork.first
         backdropUrls = artwork.second
 
@@ -358,7 +361,7 @@ fun FirePlexApp(repo: PlexRepository) {
             updateVodStatus = "Waiting"
             updateSeriesStatus = "Waiting"
             updateArtworkStatus = "Waiting"
-            status = "Updating media contents..."
+            status = "Updating home content..."
 
             try {
                 if (repo.savedServerBase().isNullOrBlank()) {
@@ -373,42 +376,55 @@ fun FirePlexApp(repo: PlexRepository) {
                 hiddenKeys = repo.hiddenLibraryKeys()
                 val enabled = freshLibraries.filterNot { hiddenKeys.contains(it.key) }
 
-                updateVodStatus = "Updating..."
+                updateVodStatus = "Updating home row..."
                 val movies = repo.recentlyAddedMovies(enabled)
                 recentlyMovies = movies
                 updateVodStatus = "Completed"
 
-                updateSeriesStatus = "Updating..."
+                updateSeriesStatus = "Updating home row..."
                 val shows = repo.recentlyAddedShows(enabled)
                 recentlyShows = shows
                 updateSeriesStatus = "Completed"
 
-                enabled.forEach { library ->
-                    val items = runCatching { repo.libraryItems(library) }.getOrDefault(emptyList())
-                    repo.saveLibraryCache(library.key, items)
-                }
-
                 val watching = repo.continueWatching()
                 continueWatching = watching
 
-                updateArtworkStatus = "Updating..."
-                val artwork = loadArtwork(movies + shows + watching)
-                artworkUrls = artwork.first
-                backdropUrls = artwork.second
-                updateArtworkStatus = "Completed"
+                updateArtworkStatus = "Caching visible artwork..."
+                val artwork = loadArtwork((movies + shows + watching).take(120))
+                artworkUrls = artworkUrls + artwork.first
+                backdropUrls = backdropUrls + artwork.second
+                updateArtworkStatus = "Visible artwork cached"
 
                 repo.saveHomeCache(freshLibraries, movies, shows)
                 refreshFavoritesFromCache()
                 cachedAt = repo.cachedUpdatedAt()
-                status = "Media contents updated."
+                status = "Home updated. Categories will keep caching in the background."
+                loading = false
+
+                // Keep the update screen quick. Cache categories in the background after the home is usable.
+                scope.launch {
+                    val priorityLibraries = enabled
+                        .sortedBy { if (it.type.equals("movie", true) || it.type.equals("show", true) || it.type.equals("tv", true)) 0 else 1 }
+
+                    priorityLibraries.forEachIndexed { index, library ->
+                        try {
+                            updateArtworkStatus = "Background caching ${index + 1}/${priorityLibraries.size}: ${library.title}"
+                            preloadLibraryInBackground(library)
+                            delay(250)
+                        } catch (_: Throwable) {
+                            // Leave the app usable even if one category fails.
+                        }
+                    }
+                    updateArtworkStatus = "Background cache complete"
+                    status = "Content cache complete."
+                }
             } catch (e: Throwable) {
                 status = e.message ?: "Could not update media contents."
-                if (updateVodStatus == "Updating...") updateVodStatus = "Failed"
-                if (updateSeriesStatus == "Updating...") updateSeriesStatus = "Failed"
-                if (updateArtworkStatus == "Updating...") updateArtworkStatus = "Failed"
+                if (updateVodStatus == "Updating home row...") updateVodStatus = "Failed"
+                if (updateSeriesStatus == "Updating home row...") updateSeriesStatus = "Failed"
+                if (updateArtworkStatus.startsWith("Caching")) updateArtworkStatus = "Failed"
+                loading = false
             }
-
-            loading = false
         }
     }
 
@@ -447,6 +463,9 @@ fun FirePlexApp(repo: PlexRepository) {
             favoriteItems = emptyList()
             showFavoritesScreen = false
             mediaItems = emptyList()
+            categoryMemoryCache = emptyMap()
+            preloadingLibraryKeys = emptySet()
+            libraryLoadingMore = false
             artworkUrls = emptyMap()
             backdropUrls = emptyMap()
             showSettings = false
@@ -946,9 +965,50 @@ fun FirePlexApp(repo: PlexRepository) {
         }
     }
 
+    fun preloadLibraryInBackground(library: PlexLibrary) {
+        if (library.key.isBlank()) return
+        if (preloadingLibraryKeys.contains(library.key)) return
+
+        scope.launch {
+            preloadingLibraryKeys = preloadingLibraryKeys + library.key
+            try {
+                val memoryItems = categoryMemoryCache[library.key].orEmpty()
+                val cachedItems = repo.cachedLibraryItems(library.key)
+                if (memoryItems.isNotEmpty() || cachedItems.isNotEmpty()) {
+                    val items = if (memoryItems.isNotEmpty()) memoryItems else cachedItems
+                    categoryMemoryCache = categoryMemoryCache + (library.key to items)
+                    val firstArtwork = loadArtwork(items.take(80))
+                    artworkUrls = artworkUrls + firstArtwork.first
+                    backdropUrls = backdropUrls + firstArtwork.second
+                    return@launch
+                }
+
+                val freshItems = repo.libraryItems(library)
+                if (freshItems.isNotEmpty()) {
+                    categoryMemoryCache = categoryMemoryCache + (library.key to freshItems)
+                    repo.saveLibraryCache(library.key, freshItems)
+
+                    val firstArtwork = loadArtwork(freshItems.take(80))
+                    artworkUrls = artworkUrls + firstArtwork.first
+                    backdropUrls = backdropUrls + firstArtwork.second
+
+                    // Continue generating the rest of the artwork URLs without blocking category opening.
+                    val remainingArtwork = loadArtwork(freshItems.drop(80))
+                    artworkUrls = artworkUrls + remainingArtwork.first
+                    backdropUrls = backdropUrls + remainingArtwork.second
+                }
+            } catch (_: Throwable) {
+                // Background preload must never break browsing.
+            } finally {
+                preloadingLibraryKeys = preloadingLibraryKeys - library.key
+            }
+        }
+    }
+
     fun loadLibraryItems(library: PlexLibrary) {
         scope.launch {
             loading = true
+            libraryLoadingMore = false
             status = "Opening ${library.title}..."
 
             try {
@@ -964,32 +1024,74 @@ fun FirePlexApp(repo: PlexRepository) {
                 showSettings = false
                 showUpdateScreen = false
 
-                val cachedItems = repo.cachedLibraryItems(library.key)
-                mediaItems = if (cachedItems.isNotEmpty()) {
-                    status = "Loaded ${library.title} from saved content."
-                    cachedItems
+                val memoryItems = categoryMemoryCache[library.key].orEmpty()
+                val cachedItems = if (memoryItems.isEmpty()) repo.cachedLibraryItems(library.key) else emptyList()
+                val instantItems = if (memoryItems.isNotEmpty()) memoryItems else cachedItems
+
+                if (instantItems.isNotEmpty()) {
+                    mediaItems = instantItems
+                    categoryMemoryCache = categoryMemoryCache + (library.key to instantItems)
+                    val firstArtwork = loadArtwork(instantItems.take(80))
+                    artworkUrls = artworkUrls + firstArtwork.first
+                    backdropUrls = backdropUrls + firstArtwork.second
+                    status = "Showing saved ${library.title}. Loading newer content in background..."
+                    loading = false
+                    libraryLoadingMore = true
+
+                    scope.launch {
+                        try {
+                            val freshItems = repo.libraryItems(library)
+                            if (freshItems.isNotEmpty()) {
+                                mediaItems = freshItems
+                                categoryMemoryCache = categoryMemoryCache + (library.key to freshItems)
+                                repo.saveLibraryCache(library.key, freshItems)
+
+                                val visibleArtwork = loadArtwork(freshItems.take(120))
+                                artworkUrls = artworkUrls + visibleArtwork.first
+                                backdropUrls = backdropUrls + visibleArtwork.second
+                                status = "Updated ${library.title}."
+
+                                val restArtwork = loadArtwork(freshItems.drop(120))
+                                artworkUrls = artworkUrls + restArtwork.first
+                                backdropUrls = backdropUrls + restArtwork.second
+                            }
+                            refreshFavoritesFromCache()
+                        } catch (_: Throwable) {
+                            status = "Showing saved ${library.title}."
+                        } finally {
+                            libraryLoadingMore = false
+                        }
+                    }
                 } else {
-                    status = "Loading ${library.title} from Plex..."
+                    status = "Loading first items from ${library.title}..."
                     val freshItems = repo.libraryItems(library)
+                    mediaItems = freshItems
+                    categoryMemoryCache = categoryMemoryCache + (library.key to freshItems)
                     repo.saveLibraryCache(library.key, freshItems)
-                    freshItems
-                }
 
-                val artwork = loadArtwork(mediaItems)
-                artworkUrls = artworkUrls + artwork.first
-                backdropUrls = backdropUrls + artwork.second
-                refreshFavoritesFromCache()
+                    val firstArtwork = loadArtwork(freshItems.take(120))
+                    artworkUrls = artworkUrls + firstArtwork.first
+                    backdropUrls = backdropUrls + firstArtwork.second
+                    refreshFavoritesFromCache()
 
-                status = if (mediaItems.isEmpty()) {
-                    "No videos found in ${library.title}."
-                } else {
-                    "Choose something to watch."
+                    status = if (freshItems.isEmpty()) {
+                        "No videos found in ${library.title}."
+                    } else {
+                        "Choose something to watch."
+                    }
+                    loading = false
+
+                    scope.launch {
+                        val restArtwork = loadArtwork(freshItems.drop(120))
+                        artworkUrls = artworkUrls + restArtwork.first
+                        backdropUrls = backdropUrls + restArtwork.second
+                    }
                 }
             } catch (e: Throwable) {
                 status = e.message ?: "Could not load category content."
+                loading = false
+                libraryLoadingMore = false
             }
-
-            loading = false
         }
     }
 
@@ -1345,7 +1447,9 @@ fun FirePlexApp(repo: PlexRepository) {
                                 status = status,
                                 loading = loading,
                                 cachedAt = cachedAt,
+                                loadingMore = libraryLoadingMore,
                                 onOpenLibrary = { loadLibraryItems(it) },
+                                onPreloadLibrary = { preloadLibraryInBackground(it) },
                                 onToggleFavorite = { toggleFavorite(it) },
                                 onOpenSettings = { showSettings = true },
                                 onOpenUpdate = { showUpdateScreen = true },
@@ -1365,7 +1469,9 @@ fun FirePlexApp(repo: PlexRepository) {
                                 status = status,
                                 loading = loading,
                                 cachedAt = cachedAt,
+                                loadingMore = libraryLoadingMore,
                                 onOpenLibrary = { loadLibraryItems(it) },
+                                onPreloadLibrary = { preloadLibraryInBackground(it) },
                                 onToggleFavorite = { toggleFavorite(it) },
                                 onOpenSettings = { showSettings = true },
                                 onOpenUpdate = { showUpdateScreen = true },
@@ -1779,7 +1885,9 @@ fun MobileContentBrowseScreen(
     status: String,
     loading: Boolean,
     cachedAt: Long,
+    loadingMore: Boolean,
     onOpenLibrary: (PlexLibrary) -> Unit,
+    onPreloadLibrary: (PlexLibrary) -> Unit,
     onToggleFavorite: (PlexMediaItem) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenUpdate: () -> Unit,
@@ -1803,6 +1911,19 @@ fun MobileContentBrowseScreen(
         "RECENTLY ADDED" -> "RECENTLY ADDED"
         "CONTINUE WATCHING" -> "CONTINUE WATCHING"
         else -> libraryByKey[selectedCategory]?.title?.uppercase() ?: selectedCategory
+    }
+
+    LaunchedEffect(selectedCategory, modeLibraries) {
+        delay(900)
+        val selectedIndex = modeLibraries.indexOfFirst { it.key == selectedCategory }
+        val nextLibrary = when {
+            selectedIndex >= 0 -> modeLibraries.getOrNull(selectedIndex + 1)
+            selectedCategory == "RECENTLY ADDED" || selectedCategory == "CONTINUE WATCHING" -> modeLibraries.firstOrNull()
+            else -> null
+        }
+        if (nextLibrary != null) {
+            onPreloadLibrary(nextLibrary)
+        }
     }
 
     val baseGridItems = when (selectedCategory) {
@@ -1853,7 +1974,7 @@ fun MobileContentBrowseScreen(
         }
 
         Spacer(Modifier.height(8.dp))
-        Text(if (loading) "Loading..." else status, color = Color(0xFFB7C7D8), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(if (loading) "Loading..." else if (loadingMore) "$status  Loading more..." else status, color = Color(0xFFB7C7D8), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(8.dp))
 
         if (visibleGridItems.isEmpty()) {
@@ -1873,6 +1994,11 @@ fun MobileContentBrowseScreen(
                         onClick = { onSelectDetails(item) },
                         onLongClick = { onToggleFavorite(item) }
                     )
+                }
+                if (loadingMore) {
+                    item {
+                        LoadingMoreTile()
+                    }
                 }
             }
         }
@@ -2227,7 +2353,9 @@ fun ContentBrowseScreen(
     status: String,
     loading: Boolean,
     cachedAt: Long,
+    loadingMore: Boolean,
     onOpenLibrary: (PlexLibrary) -> Unit,
+    onPreloadLibrary: (PlexLibrary) -> Unit,
     onToggleFavorite: (PlexMediaItem) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenUpdate: () -> Unit,
@@ -2256,6 +2384,19 @@ fun ContentBrowseScreen(
         "RECENTLY ADDED" -> "RECENTLY ADDED"
         "CONTINUE WATCHING" -> "CONTINUE WATCHING"
         else -> libraryByKey[selectedCategory]?.title?.uppercase() ?: selectedCategory
+    }
+
+    LaunchedEffect(selectedCategory, modeLibraries) {
+        delay(900)
+        val selectedIndex = modeLibraries.indexOfFirst { it.key == selectedCategory }
+        val nextLibrary = when {
+            selectedIndex >= 0 -> modeLibraries.getOrNull(selectedIndex + 1)
+            selectedCategory == "RECENTLY ADDED" || selectedCategory == "CONTINUE WATCHING" -> modeLibraries.firstOrNull()
+            else -> null
+        }
+        if (nextLibrary != null) {
+            onPreloadLibrary(nextLibrary)
+        }
     }
 
     val baseGridItems = when (selectedCategory) {
@@ -2345,7 +2486,7 @@ fun ContentBrowseScreen(
                 }
             }
 
-            Text(if (loading) "Loading..." else status, color = Color(0xFFB7C7D8), fontSize = 11.sp)
+            Text(if (loading) "Loading..." else if (loadingMore) "$status  Loading more in background..." else status, color = Color(0xFFB7C7D8), fontSize = 11.sp)
             Spacer(Modifier.height(8.dp))
 
             if (visibleGridItems.isEmpty()) {
@@ -2366,8 +2507,35 @@ fun ContentBrowseScreen(
                             onLongClick = { onToggleFavorite(item) }
                         )
                     }
+                    if (loadingMore) {
+                        item {
+                            LoadingMoreTile()
+                        }
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun LoadingMoreTile() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0x99111820)),
+        border = BorderStroke(1.dp, Color(0x44FFFFFF)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            CircularProgressIndicator(color = Color(0xFFE5A00D), modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+            Spacer(Modifier.height(10.dp))
+            Text("Loading more...", color = Color.White, fontSize = 13.sp, textAlign = TextAlign.Center)
         }
     }
 }
