@@ -42,23 +42,23 @@ fun deviceProfileConfig(profile: DeviceProfile, context: Context): DeviceProfile
     val resolved = if (profile == DeviceProfile.Auto) detectedDeviceProfile(context) else profile
     return when (resolved) {
         DeviceProfile.FireStickLite -> DeviceProfileConfig(
-            streamMode = "transcode",
+            streamMode = "auto",
             exoSettings = ExoPlayerSettings(preBufferSeconds = 30, zoomMode = "best_fit", subtitlesEnabled = true, volumePercent = 100)
         )
         DeviceProfile.GoogleTv -> DeviceProfileConfig(
-            streamMode = "transcode",
+            streamMode = "auto",
             exoSettings = ExoPlayerSettings(preBufferSeconds = 20, zoomMode = "best_fit", subtitlesEnabled = true, volumePercent = 100)
         )
         DeviceProfile.FastWifi -> DeviceProfileConfig(
-            streamMode = "direct_play",
+            streamMode = "auto",
             exoSettings = ExoPlayerSettings(preBufferSeconds = 10, zoomMode = "best_fit", subtitlesEnabled = true, volumePercent = 100)
         )
         DeviceProfile.SlowWifi -> DeviceProfileConfig(
-            streamMode = "transcode",
+            streamMode = "auto",
             exoSettings = ExoPlayerSettings(preBufferSeconds = 40, zoomMode = "best_fit", subtitlesEnabled = true, volumePercent = 100)
         )
         DeviceProfile.MobileData -> DeviceProfileConfig(
-            streamMode = "transcode",
+            streamMode = "auto",
             exoSettings = ExoPlayerSettings(preBufferSeconds = 45, zoomMode = "best_fit", subtitlesEnabled = true, volumePercent = 90)
         )
         DeviceProfile.Auto -> error("Auto profile must be resolved before configuration")
