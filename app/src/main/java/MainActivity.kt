@@ -669,8 +669,17 @@ fun FirePlexApp(repo: PlexRepository) {
             selectedMode = null
             selectedLibrary = null
             selectedDetailItem = null
-            status = "Preparing global search..."
+            status = "Preparing global search for Movies + TV Series..."
+
             val collected = mutableListOf<PlexMediaItem>()
+            fun publishSearchItems(message: String) {
+                globalSearchItems = collected
+                    .filter { it.title.isNotBlank() }
+                    .distinctBy { mediaItemStableId(it) }
+                    .sortedBy { it.title.lowercase() }
+                status = message
+            }
+
             collected += recentlyMovies
             collected += recentlyShows
             collected += continueWatching
@@ -678,14 +687,37 @@ fun FirePlexApp(repo: PlexRepository) {
             collected += mediaItems
             collected += seasonItems
             collected += episodeItems
-            libraries.forEach { library ->
-                collected += runCatching { repo.cachedLibraryItems(library.key) }.getOrDefault(emptyList())
+            publishSearchItems("Loading cached Movies + TV Series...")
+
+            val enabledLibraries = libraries
+                .filterNot { hiddenKeys.contains(it.key) }
+                .filter { library ->
+                    library.type.equals("movie", ignoreCase = true) ||
+                        library.type.equals("show", ignoreCase = true) ||
+                        library.type.equals("tv", ignoreCase = true)
+                }
+
+            enabledLibraries.forEachIndexed { index, library ->
+                val cached = runCatching { repo.cachedLibraryItems(library.key) }.getOrDefault(emptyList())
+                if (cached.isNotEmpty()) {
+                    collected += cached
+                    publishSearchItems("Loaded cached ${library.title} for global search...")
+                } else {
+                    status = "Adding ${library.title} to global search (${index + 1}/${enabledLibraries.size})..."
+                    val fresh = runCatching { repo.libraryItems(library) }.getOrDefault(emptyList())
+                    if (fresh.isNotEmpty()) {
+                        collected += fresh
+                        categoryMemoryCache = categoryMemoryCache + (library.key to fresh)
+                        repo.saveLibraryCache(library.key, fresh)
+                        val artwork = loadArtwork(fresh.take(80))
+                        artworkUrls = artworkUrls + artwork.first
+                        backdropUrls = backdropUrls + artwork.second
+                        publishSearchItems("Added ${library.title} to global search...")
+                    }
+                }
             }
-            globalSearchItems = collected
-                .filter { it.title.isNotBlank() }
-                .distinctBy { mediaItemStableId(it) }
-                .sortedBy { it.title.lowercase() }
-            status = "Search movies and TV series."
+
+            publishSearchItems("Search Movies and TV Series.")
             loading = false
         }
     }
@@ -3591,11 +3623,11 @@ fun FocusOptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
             .tvRemoteClick(onClick = onClick),
         color = when {
             focused -> Color(0xFF00FF66)
-            selected -> Color(0xFF29445A)
-            else -> Color(0x99111820)
+            selected -> Color(0xFF2A3442)
+            else -> Color(0xFF151C27)
         },
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(if (active) 2.dp else 1.dp, if (active) Color(0xFF00FF66) else Color(0x44566678))
+        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFF00FF66) else if (selected) Color(0xFF5D7188) else Color(0x44566678))
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp)) {
             Text(text, color = if (focused) Color.Black else Color.White, fontSize = 14.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal)
@@ -3606,15 +3638,20 @@ fun FocusOptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 fun FocusActionButton(text: String, modifier: Modifier = Modifier, color: Color, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
+    val normalColor = when (color) {
+        Color(0xFF00E676), Color(0xFF00FF66) -> Color(0xFF244131)
+        Color(0xFF007C86) -> Color(0xFF123642)
+        else -> color
+    }
     Surface(
         modifier = modifier
-            .height(52.dp)
+            .height(if (focused) 56.dp else 52.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .tvRemoteClick(onClick = onClick),
-        color = if (focused) Color(0xFF00FF66) else color,
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color.White else Color.Transparent)
+        color = if (focused) Color(0xFF00FF66) else normalColor,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(if (focused) 4.dp else 1.dp, if (focused) Color(0xFF001A0A) else Color(0x55566678))
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(text, color = if (focused) Color.Black else Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
