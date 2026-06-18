@@ -1528,6 +1528,8 @@ fun FirePlexApp(repo: PlexRepository) {
     }
 }
 
+}
+
 @Composable
 fun AppLoginScreen(
     playerName: String,
@@ -2738,7 +2740,6 @@ fun MenuButton(text: String, onClick: () -> Unit) {
 fun playerLabel(choice: PlayerChoice): String {
     return when (choice) {
         PlayerChoice.Exo -> "EXO (built in)"
-    }
     }
 }
 
