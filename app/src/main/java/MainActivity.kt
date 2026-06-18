@@ -42,6 +42,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.fireflicker.fireplex2.data.AppAuthRepository
 import com.fireflicker.fireplex2.data.ExoPlayerSettings
 import com.fireflicker.fireplex2.data.OpenSubtitleResult
@@ -68,6 +70,21 @@ enum class ContentMode {
 enum class AppDisplayMode {
     Tv,
     Mobile
+}
+
+@Composable
+fun cachedImageModel(url: String): Any? {
+    if (url.isBlank()) return null
+    val context = LocalContext.current
+    return remember(url) {
+        ImageRequest.Builder(context)
+            .data(url)
+            .crossfade(true)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .networkCachePolicy(CachePolicy.ENABLED)
+            .build()
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -1180,7 +1197,7 @@ fun FirePlexApp(repo: PlexRepository) {
 
             if (backgroundArt.isNotBlank() && !needsAppLogin) {
                 AsyncImage(
-                    model = backgroundArt,
+                    model = cachedImageModel(backgroundArt),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
@@ -1968,7 +1985,7 @@ fun MobilePosterCard(
             Box(modifier = Modifier.fillMaxWidth().height(165.dp).background(Color(0xFF1A2028)), contentAlignment = Alignment.Center) {
                 if (artworkUrl.isNotBlank()) {
                     AsyncImage(
-                        model = artworkUrl,
+                        model = cachedImageModel(artworkUrl),
                         contentDescription = item.title,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
@@ -3023,7 +3040,7 @@ fun MediaDetailsScreen(
             Box(modifier = Modifier.fillMaxWidth().height(330.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFF111820))) {
                 val hero = backdropUrl.ifBlank { artworkUrl }
                 if (hero.isNotBlank()) {
-                    AsyncImage(model = hero, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    AsyncImage(model = cachedImageModel(hero), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 }
 
                 Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF2050608)))))
@@ -3154,7 +3171,7 @@ fun MediaPosterCard(
         Column {
             Box(modifier = Modifier.fillMaxWidth().height(116.dp).background(Color(0xFF1A2028)), contentAlignment = Alignment.Center) {
                 if (artworkUrl.isNotBlank()) {
-                    AsyncImage(model = artworkUrl, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    AsyncImage(model = cachedImageModel(artworkUrl), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
                     Text(item.type.take(1).uppercase().ifBlank { "V" }, color = Color(0xFFE5A00D), fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 }
@@ -3407,7 +3424,7 @@ fun MediaWideRow(item: PlexMediaItem, artworkUrl: String, onClick: () -> Unit) {
         Row(modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(if (focused) 18.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(width = 116.dp, height = 78.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF1A2028)), contentAlignment = Alignment.Center) {
                 if (artworkUrl.isNotBlank()) {
-                    AsyncImage(model = artworkUrl, contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    AsyncImage(model = cachedImageModel(artworkUrl), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
                     Text(item.type.take(1).uppercase().ifBlank { "V" }, color = Color(0xFFE5A00D), fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 }
