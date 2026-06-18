@@ -15,11 +15,6 @@ android {
         targetSdk = 34
         versionCode = 3
         versionName = "0.9-tv-lite-fast"
-
-        // TV Lite: keep Android TV / Fire Stick builds ARM-only.
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-        }
     }
 
     // Builds smaller APKs for Android TV / Fire Stick devices.
