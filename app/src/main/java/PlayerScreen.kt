@@ -505,6 +505,44 @@ fun SubtitlePickerPanel(
     var subtitleLanguage by remember { mutableStateOf("en") }
     var subtitleSearchStatus by remember { mutableStateOf("Search OpenSubtitles while the video keeps playing.") }
     var openSubtitleResults by remember { mutableStateOf<List<OpenSubtitleResult>>(emptyList()) }
+    var editingSubtitleTitle by remember { mutableStateOf(false) }
+    var editingSubtitleLanguage by remember { mutableStateOf(false) }
+
+    if (editingSubtitleTitle) {
+        AlertDialog(
+            onDismissRequest = { editingSubtitleTitle = false },
+            title = { Text("Search title") },
+            text = {
+                TextField(
+                    value = subtitleQuery,
+                    onValueChange = { subtitleQuery = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = { editingSubtitleTitle = false }) { Text("DONE") }
+            }
+        )
+    }
+
+    if (editingSubtitleLanguage) {
+        AlertDialog(
+            onDismissRequest = { editingSubtitleLanguage = false },
+            title = { Text("Subtitle language") },
+            text = {
+                TextField(
+                    value = subtitleLanguage,
+                    onValueChange = { subtitleLanguage = it.take(3).lowercase() },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = { editingSubtitleLanguage = false }) { Text("DONE") }
+            }
+        )
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth().heightIn(max = if (finderOpen) 430.dp else 180.dp),
@@ -569,15 +607,17 @@ fun SubtitlePickerPanel(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                     TextField(
                         value = subtitleQuery,
-                        onValueChange = { subtitleQuery = it },
-                        modifier = Modifier.weight(1f),
+                        onValueChange = {},
+                        modifier = Modifier.weight(1f).clickable { editingSubtitleTitle = true },
+                        readOnly = true,
                         singleLine = true,
-                        label = { Text("Search title") }
+                        label = { Text("Search title - press OK to edit") }
                     )
                     TextField(
                         value = subtitleLanguage,
-                        onValueChange = { subtitleLanguage = it.take(3).lowercase() },
-                        modifier = Modifier.width(92.dp),
+                        onValueChange = {},
+                        modifier = Modifier.width(118.dp).clickable { editingSubtitleLanguage = true },
+                        readOnly = true,
                         singleLine = true,
                         label = { Text("Lang") }
                     )
