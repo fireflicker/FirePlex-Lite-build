@@ -1,3 +1,5 @@
+
+}
 package com.fireflicker.fireplex2.data
 
 import android.content.Context
@@ -164,15 +166,12 @@ class PlexRepository(private val context: Context) {
     }
 
     suspend fun preferredPlayer(): String {
-        return context.dataStore.data.first()[preferredPlayerKey]
-            ?.takeIf { it == "vlc" || it == "exo" || it == "mpv" }
-            ?: "exo"
+        return "exo"
     }
 
     suspend fun savePreferredPlayer(player: String) {
-        val clean = player.lowercase().takeIf { it == "vlc" || it == "exo" || it == "mpv" } ?: "exo"
         context.dataStore.edit {
-            it[preferredPlayerKey] = clean
+            it[preferredPlayerKey] = "exo"
         }
     }
 
@@ -548,7 +547,7 @@ class PlexRepository(private val context: Context) {
         val base = serverBase()
         val token = savedToken() ?: error("Not linked")
 
-        if (item.partKey.isBlank()) {
+        if (mode == "direct_play" && item.partKey.isBlank()) {
             error("This item has no direct playable video file.")
         }
 
@@ -559,8 +558,10 @@ class PlexRepository(private val context: Context) {
         }
     }
 
-    private fun plexTranscodeUrl(base: String, token: String, item: PlexMediaItem, directStream: Boolean): String {
+    private suspend fun plexTranscodeUrl(base: String, token: String, item: PlexMediaItem, directStream: Boolean): String {
         val metadataPath = item.key.takeIf { it.isNotBlank() } ?: "/library/metadata/${item.ratingKey}"
+        val clientIdentifier = clientId()
+        val sessionIdentifier = UUID.randomUUID().toString()
 
         // Google TV / Fire Stick safe playback:
         // - Always use HLS for ExoPlayer.
@@ -588,7 +589,12 @@ class PlexRepository(private val context: Context) {
             append("&audioBoost=100")
             append("&videoQuality=80")
             append("&maxVideoBitrate=12000")
-            append("&location=lan")
+            append("&X-Plex-Product=${encode("FirePlex")}")
+            append("&X-Plex-Version=${encode("1.0")}")
+            append("&X-Plex-Platform=${encode("Android")}")
+            append("&X-Plex-Device=${encode("Android TV")}")
+            append("&X-Plex-Client-Identifier=${encode(clientIdentifier)}")
+            append("&X-Plex-Session-Identifier=${encode(sessionIdentifier)}")
             append("&X-Plex-Token=${encode(token)}")
         }
     }
