@@ -6,6 +6,6 @@ import kotlinx.serialization.Serializable
 data class ExoPlayerSettings(
     val preBufferSeconds: Int = 20,
     val zoomMode: String = "fill",
-    val subtitlesEnabled: Boolean = true,
+    val subtitlesEnabled: Boolean = false,
     val volumePercent: Int = 100
 )
