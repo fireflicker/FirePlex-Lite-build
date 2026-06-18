@@ -13,18 +13,8 @@ android {
         applicationId = "com.fireflicker.fireplex2"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.9-tv-lite-fast"
-    }
-
-    // Builds smaller APKs for Android TV / Fire Stick devices.
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a")
-            isUniversalApk = false
-        }
+        versionCode = 4
+        versionName = "1.0-unified"
     }
 
     compileOptions {
