@@ -1,5 +1,3 @@
-
-}
 package com.fireflicker.fireplex2.data
 
 import android.content.Context
