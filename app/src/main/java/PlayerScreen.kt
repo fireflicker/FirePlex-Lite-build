@@ -15,6 +15,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -265,7 +270,49 @@ fun ExoVideoPlayer(
         onDispose { lifecycleOwner?.lifecycle?.removeObserver(observer) }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black).clickable { controlsVisible = !controlsVisible }) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionCenter, Key.Enter -> {
+                        if (controlsVisible) {
+                            if (player.isPlaying) player.pause() else player.play()
+                            updatePlayerState()
+                        } else {
+                            controlsVisible = true
+                        }
+                        true
+                    }
+                    Key.DirectionLeft -> {
+                        controlsVisible = true
+                        player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+                        updatePlayerState()
+                        true
+                    }
+                    Key.DirectionRight -> {
+                        controlsVisible = true
+                        player.seekTo(player.currentPosition + 30_000L)
+                        updatePlayerState()
+                        true
+                    }
+                    Key.DirectionUp -> {
+                        controlsVisible = true
+                        subtitlesOpen = true
+                        true
+                    }
+                    Key.DirectionDown -> {
+                        controlsVisible = !controlsVisible
+                        true
+                    }
+                    else -> false
+                }
+            }
+            .focusable()
+            .clickable { controlsVisible = !controlsVisible }
+    ) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { viewContext ->
