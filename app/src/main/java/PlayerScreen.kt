@@ -29,8 +29,10 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.AudioAttributes
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.fireflicker.fireplex2.data.ExoPlayerSettings
@@ -119,14 +121,34 @@ fun ExoVideoPlayer(
     var durationMs by remember { mutableStateOf(0L) }
 
     val player = remember(playUrl, subtitleUrl, settings.preBufferSeconds) {
-        val targetBufferMs = settings.preBufferSeconds.coerceIn(5, 60) * 1000
+        val targetBufferMs = settings.preBufferSeconds.coerceIn(10, 60) * 1000
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(targetBufferMs, targetBufferMs * 2, 1500, 3000)
+            .setBufferDurationsMs(targetBufferMs, targetBufferMs * 2, 2500, 5000)
             .build()
-        ExoPlayer.Builder(context).setLoadControl(loadControl).build().apply {
-            playWhenReady = true
-            volume = settings.volumePercent.coerceIn(0, 100) / 100f
+
+        val trackSelector = DefaultTrackSelector(context).apply {
+            setParameters(
+                buildUponParameters()
+                    .setPreferredAudioLanguages("eng", "en")
+                    .setMaxAudioChannelCount(2)
+            )
         }
+
+        ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .setTrackSelector(trackSelector)
+            .build()
+            .apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                        .build(),
+                    true
+                )
+                playWhenReady = true
+                volume = settings.volumePercent.coerceIn(0, 100) / 100f
+            }
     }
 
     fun resizeModeFor(zoom: String): Int {
