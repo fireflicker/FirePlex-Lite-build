@@ -21,8 +21,8 @@
     <application
         android:theme="@style/AppTheme"
         android:label="FirePlex3.0"
-        android:icon="@drawable/app_logo"
-        android:roundIcon="@drawable/app_logo"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:banner="@drawable/app_banner"
         android:allowBackup="true"
         android:supportsRtl="true"
