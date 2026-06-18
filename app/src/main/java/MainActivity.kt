@@ -25,11 +25,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.composed
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -134,6 +140,8 @@ fun FirePlexApp(repo: PlexRepository) {
     var favoriteKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var favoriteItems by remember { mutableStateOf<List<PlexMediaItem>>(emptyList()) }
     var showFavoritesScreen by remember { mutableStateOf(false) }
+    var showGlobalSearch by remember { mutableStateOf(false) }
+    var globalSearchItems by remember { mutableStateOf<List<PlexMediaItem>>(emptyList()) }
     var artworkUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var backdropUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var cachedAt by remember { mutableStateOf(0L) }
@@ -205,6 +213,7 @@ fun FirePlexApp(repo: PlexRepository) {
         showSettings = false
         showUpdateScreen = false
         showFavoritesScreen = false
+        showGlobalSearch = false
         selectedMode = null
         selectedLibrary = null
         selectedShow = null
@@ -221,6 +230,11 @@ fun FirePlexApp(repo: PlexRepository) {
             selectedItem != null -> {
                 clearPlayback()
                 status = "Choose something to play."
+            }
+
+            showGlobalSearch -> {
+                showGlobalSearch = false
+                status = "Choose something to watch."
             }
 
             showFavoritesScreen -> {
@@ -260,7 +274,7 @@ fun FirePlexApp(repo: PlexRepository) {
             selectedMode != null -> {
                 selectedMode = null
                 selectedDetailItem = null
-                status = "Choose VOD or Series."
+                status = "Choose Movies or Series."
             }
 
             showSettings -> {
@@ -465,6 +479,8 @@ fun FirePlexApp(repo: PlexRepository) {
             favoriteKeys = emptySet()
             favoriteItems = emptyList()
             showFavoritesScreen = false
+            showGlobalSearch = false
+            globalSearchItems = emptyList()
             artworkUrls = emptyMap()
             backdropUrls = emptyMap()
             cachedAt = 0L
@@ -489,6 +505,8 @@ fun FirePlexApp(repo: PlexRepository) {
             favoriteKeys = emptySet()
             favoriteItems = emptyList()
             showFavoritesScreen = false
+            showGlobalSearch = false
+            globalSearchItems = emptyList()
             mediaItems = emptyList()
             categoryMemoryCache = emptyMap()
             preloadingLibraryKeys = emptySet()
@@ -569,6 +587,7 @@ fun FirePlexApp(repo: PlexRepository) {
                 showSettings = false
                 showUpdateScreen = false
                 showFavoritesScreen = false
+                showGlobalSearch = false
                 selectedMode = null
                 selectedLibrary = null
                 selectedShow = null
@@ -586,7 +605,7 @@ fun FirePlexApp(repo: PlexRepository) {
                     showUpdateScreen = true
                     updateContent()
                 } else {
-                    status = "Choose VOD or Series."
+                    status = "Choose Movies or Series."
                     refreshHomeInBackground()
                 }
             } catch (e: Throwable) {
@@ -636,6 +655,37 @@ fun FirePlexApp(repo: PlexRepository) {
             status = "Loading favourites..."
             refreshFavoritesFromCache()
             status = if (favoriteItems.isEmpty()) "No favourites yet. Hold OK / long press a poster to add one." else "Choose a favourite."
+            loading = false
+        }
+    }
+
+    fun openGlobalSearch() {
+        scope.launch {
+            loading = true
+            showGlobalSearch = true
+            showFavoritesScreen = false
+            showSettings = false
+            showUpdateScreen = false
+            selectedMode = null
+            selectedLibrary = null
+            selectedDetailItem = null
+            status = "Preparing global search..."
+            val collected = mutableListOf<PlexMediaItem>()
+            collected += recentlyMovies
+            collected += recentlyShows
+            collected += continueWatching
+            collected += favoriteItems
+            collected += mediaItems
+            collected += seasonItems
+            collected += episodeItems
+            libraries.forEach { library ->
+                collected += runCatching { repo.cachedLibraryItems(library.key) }.getOrDefault(emptyList())
+            }
+            globalSearchItems = collected
+                .filter { it.title.isNotBlank() }
+                .distinctBy { mediaItemStableId(it) }
+                .sortedBy { it.title.lowercase() }
+            status = "Search movies and TV series."
             loading = false
         }
     }
@@ -968,7 +1018,7 @@ fun FirePlexApp(repo: PlexRepository) {
             status = "Opening ${library.title}..."
 
             try {
-                // Keep the user on the VOD / Series category page.
+                // Keep the user on the Movies / Series category page.
                 // Do NOT switch to LibraryContentScreen, because that is the wide-row library screen.
                 selectedLibrary = null
                 selectedShow = null
@@ -1278,6 +1328,18 @@ fun FirePlexApp(repo: PlexRepository) {
                         )
                     }
 
+                    showGlobalSearch -> {
+                        GlobalSearchScreen(
+                            items = globalSearchItems,
+                            artworkUrls = artworkUrls,
+                            favoriteKeys = favoriteKeys,
+                            loading = loading,
+                            status = status,
+                            onSelectDetails = { openDetails(it) },
+                            onToggleFavorite = { toggleFavorite(it) }
+                        )
+                    }
+
                     showFavoritesScreen -> {
                         FavoritesScreen(
                             items = favoriteItems,
@@ -1445,6 +1507,7 @@ fun FirePlexApp(repo: PlexRepository) {
                                 onOpenVod = { selectedMode = ContentMode.Vod },
                                 onOpenSeries = { selectedMode = ContentMode.Series },
                                 onOpenFavorites = { openFavorites() },
+                                onOpenSearch = { openGlobalSearch() },
                                 onOpenSettings = { showSettings = true },
                                 onOpenUpdate = { showUpdateScreen = true }
                             )
@@ -1466,6 +1529,7 @@ fun FirePlexApp(repo: PlexRepository) {
                                 onOpenVod = { selectedMode = ContentMode.Vod },
                                 onOpenSeries = { selectedMode = ContentMode.Series },
                                 onOpenFavorites = { openFavorites() },
+                                onOpenSearch = { openGlobalSearch() },
                                 onOpenSettings = { showSettings = true },
                                 onOpenUpdate = { showUpdateScreen = true },
                                 onSelectDetails = { openDetails(it) },
@@ -1732,7 +1796,7 @@ fun DisplayModeTile(
         modifier = modifier
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onClick() },
+            .tvRemoteClick(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF203040) else Color(0xE90B0D25)),
         border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFF00E676) else Color(0x44FFFFFF)),
         shape = RoundedCornerShape(24.dp)
@@ -1763,6 +1827,7 @@ fun MobileLobbyScreen(
     onOpenVod: () -> Unit,
     onOpenSeries: () -> Unit,
     onOpenFavorites: () -> Unit,
+    onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenUpdate: () -> Unit
 ) {
@@ -1794,9 +1859,10 @@ fun MobileLobbyScreen(
 
         item {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                MobileBigButton("VOD", "Movies and films", !allLibrariesHidden && libraries.any { it.type.equals("movie", true) }, onOpenVod)
+                MobileBigButton("MOVIES", "Films and movies", !allLibrariesHidden && libraries.any { it.type.equals("movie", true) }, onOpenVod)
                 MobileBigButton("SERIES", "TV shows and seasons", !allLibrariesHidden && libraries.any { it.type.equals("show", true) || it.type.equals("tv", true) }, onOpenSeries)
                 MobileBigButton("FAVOURITES", "Saved movies and TV series", true, onOpenFavorites)
+                MobileBigButton("GLOBAL SEARCH", "Search movies and TV series", true, onOpenSearch)
                 MobileBigButton("UPDATE CONTENTS", "Refresh categories and artwork", true, onOpenUpdate)
                 MobileBigButton("SETTINGS", "Player, speed test, player name", true, onOpenSettings)
             }
@@ -1845,7 +1911,7 @@ fun MobileContentBrowseScreen(
     onSelectDetails: (PlexMediaItem) -> Unit
 ) {
     val movieMode = mode == ContentMode.Vod
-    val title = if (movieMode) "VOD" else "SERIES"
+    val title = if (movieMode) "MOVIES" else "SERIES"
     val modeLibraries = libraries.filter {
         if (movieMode) it.type.equals("movie", true) else it.type.equals("show", true) || it.type.equals("tv", true)
     }
@@ -1967,6 +2033,69 @@ fun itemMatchesMode(item: PlexMediaItem, mode: ContentMode): Boolean {
         type == "movie" || type == "video" || type == "clip"
     } else {
         type == "show" || type == "tv" || type == "season" || type == "episode"
+    }
+}
+
+
+@Composable
+fun GlobalSearchScreen(
+    items: List<PlexMediaItem>,
+    artworkUrls: Map<String, String>,
+    favoriteKeys: Set<String>,
+    loading: Boolean,
+    status: String,
+    onSelectDetails: (PlexMediaItem) -> Unit,
+    onToggleFavorite: (PlexMediaItem) -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    val results = remember(query, mediaItemsFingerprint(items)) {
+        val clean = query.trim()
+        if (clean.isBlank()) emptyList()
+        else items.filter { it.title.contains(clean, ignoreCase = true) }
+            .sortedBy { it.title.lowercase() }
+            .take(250)
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text("GLOBAL SEARCH", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black)
+        Text("Search Movies and TV Series together", color = Color(0xFF00E676), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(14.dp))
+        TextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().height(62.dp),
+            singleLine = true,
+            label = { Text("Type movie or TV show name") }
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            if (loading) "Loading search cache..." else if (query.isBlank()) status else "${results.size} result(s)",
+            color = Color(0xFFB7C7D8),
+            fontSize = 13.sp
+        )
+        Spacer(Modifier.height(12.dp))
+        if (query.isBlank()) {
+            EmptyPanel("Start typing to search Movies and TV Series.")
+        } else if (results.isEmpty()) {
+            EmptyPanel("No results found.")
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 112.dp),
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                gridItems(results, key = { mediaItemStableId(it) }) { item ->
+                    MediaPosterCard(
+                        item = item,
+                        artworkUrl = artworkUrls[item.ratingKey].orEmpty(),
+                        isFavorite = favoriteKeys.contains(mediaItemStableId(item)),
+                        onClick = { onSelectDetails(item) },
+                        onLongClick = { onToggleFavorite(item) }
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -2105,6 +2234,7 @@ fun LobbyScreen(
     onOpenVod: () -> Unit,
     onOpenSeries: () -> Unit,
     onOpenFavorites: () -> Unit,
+    onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenUpdate: () -> Unit
 ) {
@@ -2135,7 +2265,7 @@ fun LobbyScreen(
             Spacer(Modifier.weight(1f))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                LobbyCircleTile(label = "VOD", icon = "▷", enabled = !allLibrariesHidden && libraries.any { it.type.equals("movie", true) }, onClick = onOpenVod)
+                LobbyCircleTile(label = "MOVIES", icon = "▷", enabled = !allLibrariesHidden && libraries.any { it.type.equals("movie", true) }, onClick = onOpenVod)
                 Spacer(Modifier.width(32.dp))
                 LobbyCircleTile(label = "SERIES", icon = "▤", enabled = !allLibrariesHidden && libraries.any { it.type.equals("show", true) || it.type.equals("tv", true) }, onClick = onOpenSeries)
             }
@@ -2172,6 +2302,7 @@ fun TvHomeScreen(
     onOpenVod: () -> Unit,
     onOpenSeries: () -> Unit,
     onOpenFavorites: () -> Unit,
+    onOpenSearch: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenUpdate: () -> Unit,
     onSelectDetails: (PlexMediaItem) -> Unit,
@@ -2212,10 +2343,10 @@ fun TvHomeScreen(
             horizontalArrangement = Arrangement.spacedBy(18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TvQuickTile("VOD", "Movies", "▶", vodEnabled, Modifier.weight(1f)) { onOpenVod() }
+            TvQuickTile("MOVIES", "Films", "▶", vodEnabled, Modifier.weight(1f)) { onOpenVod() }
             TvQuickTile("SERIES", "TV Shows", "▦", seriesEnabled, Modifier.weight(1f)) { onOpenSeries() }
             TvQuickTile("FAVOURITES", "Saved", "★", true, Modifier.weight(1f)) { onOpenFavorites() }
-            TvQuickTile("SEARCH", "Find", "⌕", vodEnabled, Modifier.weight(1f)) { onOpenVod() }
+            TvQuickTile("GLOBAL SEARCH", "Movies + TV", "⌕", vodEnabled || seriesEnabled, Modifier.weight(1f)) { onOpenSearch() }
         }
 
         Spacer(Modifier.height(20.dp))
@@ -2239,7 +2370,7 @@ fun TvQuickTile(
             .height(if (focused) 138.dp else 128.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable(enabled)
-            .clickable(enabled = enabled) { onClick() },
+            .tvRemoteClick(enabled = enabled, onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF173B28) else Color(0xE9141720)),
         border = BorderStroke(if (focused) 4.dp else 1.dp, if (focused) Color(0xFF00FF66) else Color(0x44FFFFFF)),
         shape = RoundedCornerShape(24.dp)
@@ -2314,7 +2445,7 @@ fun ContentBrowseScreen(
     onSelectDetails: (PlexMediaItem) -> Unit
 ) {
     val movieMode = mode == ContentMode.Vod
-    val title = if (movieMode) "VOD" else "SERIES"
+    val title = if (movieMode) "MOVIES" else "SERIES"
     val modeLibraries = libraries.filter {
         if (movieMode) {
             it.type.equals("movie", true)
@@ -2503,7 +2634,7 @@ fun VodSeriesMenuItem(text: String, selected: Boolean, onClick: () -> Unit) {
             .heightIn(min = 40.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onClick() },
+            .tvRemoteClick(onClick = onClick),
         color = if (active) Color(0x3329D3FF) else Color.Transparent,
         border = if (focused) BorderStroke(2.dp, Color(0xFF00E676)) else null,
         shape = RoundedCornerShape(4.dp)
@@ -2542,7 +2673,7 @@ fun UpdateContentsScreen(
         Spacer(Modifier.height(28.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            UpdateStatusTile("VOD", vodStatus, Modifier.weight(1f))
+            UpdateStatusTile("MOVIES", vodStatus, Modifier.weight(1f))
             UpdateStatusTile("SERIES", seriesStatus, Modifier.weight(1f))
             UpdateStatusTile("ARTWORK", artworkStatus, Modifier.weight(1f))
         }
@@ -2584,7 +2715,7 @@ fun LobbyCircleTile(label: String, icon: String, enabled: Boolean, onClick: () -
             .size(if (focused) 178.dp else 164.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable(enabled)
-            .clickable(enabled = enabled) { onClick() },
+            .tvRemoteClick(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(90.dp),
         color = Color(0x33111820),
         border = BorderStroke(if (focused) 4.dp else 2.dp, borderColor)
@@ -2603,7 +2734,7 @@ fun LobbySmallButton(text: String, onClick: () -> Unit) {
         modifier = Modifier
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onClick() },
+            .tvRemoteClick(onClick = onClick),
         shape = RoundedCornerShape(6.dp),
         color = if (focused) Color(0xFF00E676) else Color.Transparent,
         border = BorderStroke(1.dp, if (focused) Color(0xFF00E676) else Color.White)
@@ -2715,7 +2846,7 @@ fun MenuButton(text: String, onClick: () -> Unit) {
             .background(bg)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onClick() }
+            .tvRemoteClick(onClick = onClick)
             .padding(10.dp),
         color = fg,
         fontSize = 15.sp,
@@ -2851,7 +2982,7 @@ fun SettingsScreen(
 
                 item {
                     SettingsCard(title = "Visible Categories") {
-                        Text("Turn categories on or off. These apply to the VOD and Series pages.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
+                        Text("Turn categories on or off. These apply to the Movies and Series pages.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
                         Spacer(Modifier.height(12.dp))
                         libraries.forEach { library ->
                             val enabled = !hiddenKeys.contains(library.key)
@@ -3107,7 +3238,7 @@ fun AlphabetButton(text: String, selected: Boolean, onClick: () -> Unit) {
             .height(34.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onClick() },
+            .tvRemoteClick(onClick = onClick),
         color = bg,
         shape = RoundedCornerShape(10.dp),
         border = if (focused || selected) BorderStroke(2.dp, Color(0xFF00E676)) else null
@@ -3227,6 +3358,37 @@ fun MediaRow(title: String, items: List<PlexMediaItem>, artworkUrls: Map<String,
     }
 }
 
+
+fun Modifier.tvRemoteClick(
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit = {}
+): Modifier = composed {
+    var keyDownAt by remember { mutableStateOf(0L) }
+    this.onPreviewKeyEvent { event ->
+        if (!enabled) return@onPreviewKeyEvent false
+        val isOk = event.key == Key.DirectionCenter || event.key == Key.Enter
+        val isMenu = event.key == Key.Menu
+        when {
+            isMenu && event.type == KeyEventType.KeyUp -> {
+                onLongClick()
+                true
+            }
+            isOk && event.type == KeyEventType.KeyDown -> {
+                if (keyDownAt == 0L) keyDownAt = System.currentTimeMillis()
+                true
+            }
+            isOk && event.type == KeyEventType.KeyUp -> {
+                val heldMs = if (keyDownAt == 0L) 0L else System.currentTimeMillis() - keyDownAt
+                keyDownAt = 0L
+                if (heldMs >= 650L) onLongClick() else onClick()
+                true
+            }
+            else -> false
+        }
+    }
+}
+
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 fun MediaPosterCard(
@@ -3246,6 +3408,7 @@ fun MediaPosterCard(
             .height(scaleHeight)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
+            .tvRemoteClick(onClick = onClick, onLongClick = onLongClick)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF17222D) else Color(0xF2111820)),
         border = if (focused) BorderStroke(3.dp, Color(0xFF00E676)) else null,
@@ -3310,9 +3473,9 @@ fun SettingsTile(title: String, icon: String, modifier: Modifier = Modifier, onC
             .height(178.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onClick() },
+            .tvRemoteClick(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF203040) else Color(0xE90B0D25)),
-        border = BorderStroke(if (focused) 5.dp else 1.dp, if (focused) Color(0xFFFFB000) else Color(0xFF273553)),
+        border = BorderStroke(if (focused) 5.dp else 1.dp, if (focused) Color(0xFF00FF66) else Color(0xFF273553)),
         shape = RoundedCornerShape(14.dp)
     ) {
         Column(
@@ -3323,12 +3486,12 @@ fun SettingsTile(title: String, icon: String, modifier: Modifier = Modifier, onC
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(icon, color = if (focused) Color(0xFFFFB000) else Color(0xFFD9DEE8), fontSize = if (focused) 54.sp else 48.sp, fontWeight = FontWeight.Light)
+            Text(icon, color = if (focused) Color(0xFF00FF66) else Color(0xFFD9DEE8), fontSize = if (focused) 54.sp else 48.sp, fontWeight = FontWeight.Light)
             Spacer(Modifier.height(12.dp))
-            Text(title, color = if (focused) Color(0xFFFFF4D6) else Color.White, fontSize = if (focused) 16.sp else 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(title, color = if (focused) Color(0xFFE8FFF0) else Color.White, fontSize = if (focused) 16.sp else 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (focused) {
                 Spacer(Modifier.height(8.dp))
-                Text("OK", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.background(Color(0xFFFFB000), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 3.dp))
+                Text("OK", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.background(Color(0xFF00FF66), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 3.dp))
             }
         }
     }
@@ -3368,7 +3531,7 @@ fun SettingsExpandRow(open: Boolean, onToggle: () -> Unit) {
             .clickable { onToggle() },
         color = if (focused) Color(0xFF203040) else Color(0x99111820),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFFFFB000) else Color(0x334B5C70))
+        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFF00FF66) else Color(0x334B5C70))
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
@@ -3376,7 +3539,7 @@ fun SettingsExpandRow(open: Boolean, onToggle: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(if (open) "Close section" else "Open section", color = if (focused) Color.White else Color(0xFFB7C7D8), fontSize = 15.sp, fontWeight = if (focused) FontWeight.Bold else FontWeight.Normal)
-            Text(if (open) "Hide" else "Show", color = if (focused) Color.Black else Color(0xFFFFB000), fontWeight = FontWeight.Black, modifier = if (focused) Modifier.background(Color(0xFFFFB000), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 5.dp) else Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
+            Text(if (open) "Hide" else "Show", color = if (focused) Color.Black else Color(0xFF00FF66), fontWeight = FontWeight.Black, modifier = if (focused) Modifier.background(Color(0xFF00FF66), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 5.dp) else Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
         }
     }
 }
@@ -3390,16 +3553,16 @@ fun SettingsToggleRow(title: String, subtitle: String, checked: Boolean, onClick
             .padding(vertical = 5.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onClick() },
+            .tvRemoteClick(onClick = onClick),
         color = if (focused) Color(0xFF203040) else Color(0x66111820),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFFFFB000) else Color(0x22384758))
+        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFF00FF66) else Color(0x22384758))
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(28.dp)
-                    .background(if (checked) Color(0xFFFFB000) else Color.Transparent, RoundedCornerShape(6.dp)),
+                    .background(if (checked) Color(0xFF00FF66) else Color.Transparent, RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(if (checked) "ON" else "", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 10.sp)
@@ -3407,10 +3570,10 @@ fun SettingsToggleRow(title: String, subtitle: String, checked: Boolean, onClick
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, color = Color.White, fontSize = 17.sp, fontWeight = if (focused) FontWeight.Black else FontWeight.Bold)
-                Text(subtitle, color = if (focused) Color(0xFFFFB000) else Color(0xFFB7C7D8), fontSize = 12.sp)
+                Text(subtitle, color = if (focused) Color(0xFF00FF66) else Color(0xFFB7C7D8), fontSize = 12.sp)
             }
             if (focused) {
-                Text("OK", color = Color.Black, fontWeight = FontWeight.Black, modifier = Modifier.background(Color(0xFFFFB000), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 5.dp))
+                Text("OK", color = Color.Black, fontWeight = FontWeight.Black, modifier = Modifier.background(Color(0xFF00FF66), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 5.dp))
             }
         }
     }
@@ -3425,14 +3588,14 @@ fun FocusOptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
             .height(40.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onClick() },
+            .tvRemoteClick(onClick = onClick),
         color = when {
-            focused -> Color(0xFFFFB000)
+            focused -> Color(0xFF00FF66)
             selected -> Color(0xFF29445A)
             else -> Color(0x99111820)
         },
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(if (active) 2.dp else 1.dp, if (active) Color(0xFFFFB000) else Color(0x44566678))
+        border = BorderStroke(if (active) 2.dp else 1.dp, if (active) Color(0xFF00FF66) else Color(0x44566678))
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp)) {
             Text(text, color = if (focused) Color.Black else Color.White, fontSize = 14.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal)
@@ -3448,7 +3611,7 @@ fun FocusActionButton(text: String, modifier: Modifier = Modifier, color: Color,
             .height(52.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onClick() },
+            .tvRemoteClick(onClick = onClick),
         color = if (focused) Color(0xFF00FF66) else color,
         shape = RoundedCornerShape(8.dp),
         border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color.White else Color.Transparent)
