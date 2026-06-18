@@ -28,8 +28,11 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.AudioAttributes
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -125,11 +128,35 @@ fun ExoVideoPlayer(
         val trackSelector = DefaultTrackSelector(context).apply {
             setParameters(
                 buildUponParameters()
+                    // Prefer common Android TV audio first. This helps avoid DTS/TrueHD/no-sound problems.
                     .setPreferredAudioLanguages("eng", "en")
+                    .setPreferredAudioMimeTypes(
+                        MimeTypes.AUDIO_AAC,
+                        MimeTypes.AUDIO_AC3,
+                        MimeTypes.AUDIO_E_AC3
+                    )
+                    .setMaxAudioChannelCount(2)
             )
         }
 
+        val renderersFactory = DefaultRenderersFactory(context)
+            // Exo uses Android MediaCodec hardware decoding by default. Decoder fallback stops
+            // cheap Google TV / Fire TV boxes from closing the player when one decoder fails.
+            .setEnableDecoderFallback(true)
+            .setAllowedVideoJoiningTimeMs(5000)
+
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(30_000)
+            .setUserAgent("FirePlex/AndroidTV Media3")
+
+        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(httpDataSourceFactory)
+
         ExoPlayer.Builder(context)
+            .setRenderersFactory(renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .setTrackSelector(trackSelector)
             .build()
@@ -158,6 +185,8 @@ fun ExoVideoPlayer(
         val lower = url.lowercase()
         return when {
             lower.contains(".vtt") || lower.contains("format=vtt") -> MimeTypes.TEXT_VTT
+            lower.contains(".ssa") || lower.contains(".ass") || lower.contains("format=ssa") || lower.contains("format=ass") -> MimeTypes.TEXT_SSA
+            lower.contains(".ttml") || lower.contains(".dfxp") || lower.contains("format=ttml") -> MimeTypes.APPLICATION_TTML
             else -> MimeTypes.APPLICATION_SUBRIP
         }
     }
@@ -204,7 +233,8 @@ fun ExoVideoPlayer(
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                onPlayerError(error.message ?: "EXO could not play this video.")
+                val detail = listOfNotNull(error.errorCodeName, error.message).joinToString(" - ")
+                onPlayerError(detail.ifBlank { "EXO could not play this video." })
             }
         }
         player.addListener(listener)
@@ -285,7 +315,7 @@ fun ExoVideoPlayer(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     FocusActionButton("-10", Modifier.width(78.dp), Color(0xAA203040)) { player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L)); updatePlayerState() }
-                    FocusActionButton(if (player.isPlaying) "PAUSE" else "PLAY", Modifier.width(110.dp), Color(0xFFE5A00D)) {
+                    FocusActionButton(if (player.isPlaying) "PAUSE" else "PLAY", Modifier.width(110.dp), Color(0xFF00E676)) {
                         if (player.isPlaying) player.pause() else player.play()
                         updatePlayerState()
                     }
@@ -342,8 +372,8 @@ fun PlayerErrorScreen(message: String, onRetryExoTranscode: () -> Unit) {
             ) {
                 Text("Player failed", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                 Text(message, color = Color(0xFFB7C7D8), fontSize = 14.sp, textAlign = TextAlign.Center)
-                Text("Try EXO with Plex Transcode.", color = Color(0xFFE5A00D), fontSize = 14.sp)
-                FocusActionButton("RETRY EXO TRANSCODE", Modifier.fillMaxWidth(), Color(0xFFE5A00D), onRetryExoTranscode)
+                Text("Try EXO with Plex Transcode.", color = Color(0xFF00E676), fontSize = 14.sp)
+                FocusActionButton("RETRY EXO TRANSCODE", Modifier.fillMaxWidth(), Color(0xFF00E676), onRetryExoTranscode)
             }
         }
     }
@@ -381,7 +411,7 @@ fun SubtitlePickerPanel(
                     FocusActionButton(
                         text = "OFF",
                         modifier = Modifier.width(82.dp),
-                        color = if (selectedSubtitle == null && externalSubtitleName == null) Color(0xFFE5A00D) else Color(0xAA203040)
+                        color = if (selectedSubtitle == null && externalSubtitleName == null) Color(0xFF00E676) else Color(0xAA203040)
                     ) {
                         onSubtitleSelected(null)
                     }
@@ -402,7 +432,7 @@ fun SubtitlePickerPanel(
                         FocusActionButton(
                             text = externalSubtitleName.take(18),
                             modifier = Modifier.widthIn(min = 130.dp, max = 210.dp),
-                            color = Color(0xFFE5A00D)
+                            color = Color(0xFF00E676)
                         ) {
                             onSubtitleSelected(selectedSubtitle)
                         }
@@ -417,7 +447,7 @@ fun SubtitlePickerPanel(
                     FocusActionButton(
                         text = label,
                         modifier = Modifier.widthIn(min = 118.dp, max = 220.dp),
-                        color = if (track == selectedSubtitle && externalSubtitleName == null) Color(0xFFE5A00D) else Color(0xAA203040)
+                        color = if (track == selectedSubtitle && externalSubtitleName == null) Color(0xFF00E676) else Color(0xAA203040)
                     ) {
                         onSubtitleSelected(track)
                     }
@@ -457,7 +487,7 @@ fun SubtitlePickerPanel(
                 }
 
                 Spacer(Modifier.height(8.dp))
-                Text(subtitleSearchStatus, color = Color(0xFFE5A00D), fontSize = 12.sp)
+                Text(subtitleSearchStatus, color = Color(0xFF00E676), fontSize = 12.sp)
 
                 if (openSubtitleResults.isNotEmpty()) {
                     Spacer(Modifier.height(8.dp))
