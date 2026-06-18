@@ -72,7 +72,7 @@ object PlexXmlParser {
                 val episodeTitle = parser.attr("title")
                 val showTitle = parser.attr("grandparentTitle")
                 val displayTitle = if (type.equals("episode", ignoreCase = true)) {
-                    showTitle.ifBlank { parser.attr("parentTitle") }.ifBlank { episodeTitle }
+                    episodeTitle.ifBlank { showTitle }.ifBlank { parser.attr("parentTitle") }
                 } else {
                     episodeTitle.ifBlank { showTitle }
                 }
@@ -84,7 +84,7 @@ object PlexXmlParser {
                     key = parser.attr("key"),
                     title = displayTitle.ifBlank { "Untitled" },
                     type = type,
-                    summary = parser.attr("summary").ifBlank { episodeTitle },
+                    summary = parser.attr("summary"),
                     thumb = parser.attr("grandparentThumb").ifBlank { parser.attr("thumb") },
                     art = parser.attr("grandparentArt").ifBlank { parser.attr("art") },
                     year = parser.attr("year"),
