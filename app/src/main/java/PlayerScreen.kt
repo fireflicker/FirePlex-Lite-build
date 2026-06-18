@@ -1,7 +1,5 @@
 package com.fireflicker.fireplex2
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -35,6 +33,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import com.fireflicker.fireplex2.data.ExoPlayerSettings
 import com.fireflicker.fireplex2.data.OpenSubtitleResult
 import com.fireflicker.fireplex2.data.PlexMediaItem
@@ -69,7 +70,7 @@ fun SelectedVideoScreen(
             }
         } else if (!errorMessage.isNullOrBlank()) {
             PlayerErrorScreen(errorMessage, onRetryExoTranscode)
-        } else if (playerChoice == PlayerChoice.Exo) {
+        } else {
             ExoVideoPlayer(
                 playUrl = playUrl,
                 itemTitle = item.title,
@@ -84,12 +85,6 @@ fun SelectedVideoScreen(
                 onOpenSubtitleSelected = onOpenSubtitleSelected,
                 onPlayerError = onPlayerError,
                 onPlayback = onPlayback
-            )
-        } else {
-            ExternalPlayerScreen(
-                playUrl = playUrl,
-                playerChoice = playerChoice,
-                onFallback = onRetryExoTranscode
             )
         }
     }
@@ -112,13 +107,14 @@ fun ExoVideoPlayer(
     onPlayback: (String, Long, Long) -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var controlsVisible by remember { mutableStateOf(true) }
     var subtitlesOpen by remember { mutableStateOf(false) }
     var speedIndex by remember { mutableStateOf(1) }
     val speeds = listOf(0.5f, 1.0f, 1.5f, 2.0f)
     var positionMs by remember { mutableStateOf(0L) }
     var durationMs by remember { mutableStateOf(0L) }
+    var resumeAfterBackground by remember { mutableStateOf(false) }
+    val initialPositionMs = remember(playUrl, subtitleUrl) { startPositionMs.coerceAtLeast(0L) }
 
     val player = remember(playUrl, subtitleUrl, settings.preBufferSeconds) {
         val targetBufferMs = settings.preBufferSeconds.coerceIn(10, 60) * 1000
@@ -130,7 +126,6 @@ fun ExoVideoPlayer(
             setParameters(
                 buildUponParameters()
                     .setPreferredAudioLanguages("eng", "en")
-                    .setMaxAudioChannelCount(2)
             )
         }
 
@@ -193,16 +188,16 @@ fun ExoVideoPlayer(
 
     LaunchedEffect(player) {
         while (true) {
-            delay(1000)
+            delay(5000)
             updatePlayerState()
             onPlayback(if (player.isPlaying) "playing" else "paused", positionMs, durationMs)
         }
     }
 
-    LaunchedEffect(playUrl, subtitleUrl, startPositionMs) {
+    LaunchedEffect(player, playUrl, subtitleUrl) {
         player.setMediaItem(buildMediaItem())
         player.prepare()
-        if (startPositionMs > 0L) player.seekTo(startPositionMs)
+        if (initialPositionMs > 0L) player.seekTo(initialPositionMs)
         player.playWhenReady = true
     }
 
@@ -214,12 +209,30 @@ fun ExoVideoPlayer(
         }
         player.addListener(listener)
         onDispose {
-            val position = player.currentPosition.coerceAtLeast(0L)
-            val duration = player.duration.takeIf { it > 0L } ?: 0L
-            scope.launch { onPlayback("stopped", position, duration) }
             player.removeListener(listener)
             player.release()
         }
+    }
+
+    DisposableEffect(context, player) {
+        val lifecycleOwner = context as? LifecycleOwner
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    resumeAfterBackground = player.isPlaying
+                    player.pause()
+                }
+                Lifecycle.Event.ON_START -> {
+                    if (resumeAfterBackground) {
+                        player.play()
+                        resumeAfterBackground = false
+                    }
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner?.lifecycle?.addObserver(observer)
+        onDispose { lifecycleOwner?.lifecycle?.removeObserver(observer) }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black).clickable { controlsVisible = !controlsVisible }) {
@@ -228,7 +241,7 @@ fun ExoVideoPlayer(
             factory = { viewContext ->
                 PlayerView(viewContext).apply {
                     this.player = player
-                    setUseController(true)
+                    setUseController(false)
                     resizeMode = resizeModeFor(settings.zoomMode)
                     keepScreenOn = true
                 }
@@ -310,63 +323,6 @@ fun ExoVideoPlayer(
                         onOpenSubtitleSelected = onOpenSubtitleSelected
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun ExternalPlayerScreen(
-    playUrl: String,
-    playerChoice: PlayerChoice,
-    onFallback: () -> Unit
-) {
-    val context = LocalContext.current
-    val packageNames = when (playerChoice) {
-        PlayerChoice.ExternalMpv -> listOf("is.xyz.mpv", "is.xyz.mpv.debug")
-        PlayerChoice.ExternalVlc -> listOf("org.videolan.vlc", "org.videolan.vlc.debug", "org.videolan.vlc.betav7neon")
-        PlayerChoice.Exo -> emptyList()
-    }
-    var launchMessage by remember(playUrl, playerChoice) { mutableStateOf("Opening ${playerLabel(playerChoice)}...") }
-
-    LaunchedEffect(playUrl, playerChoice) {
-        val packageManager = context.packageManager
-        val installedPackage = packageNames.firstOrNull { packageName ->
-            runCatching { packageManager.getPackageInfo(packageName, 0) }.isSuccess
-        }
-
-        if (installedPackage == null) {
-            launchMessage = "${playerLabel(playerChoice)} is not installed."
-            return@LaunchedEffect
-        }
-
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(Uri.parse(playUrl), "video/*")
-            setPackage(installedPackage)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-
-        try {
-            context.startActivity(intent)
-            launchMessage = "Playback opened in ${playerLabel(playerChoice)}."
-        } catch (_: ActivityNotFoundException) {
-            launchMessage = "Could not open ${playerLabel(playerChoice)}."
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xF0111820)),
-            border = BorderStroke(1.dp, Color(0x554B5C70))
-        ) {
-            Column(
-                modifier = Modifier.widthIn(max = 560.dp).padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(launchMessage, color = Color.White, fontSize = 20.sp, textAlign = TextAlign.Center)
-                Text("External players are optional in the Lite build.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
-                FocusActionButton("USE EXO + TRANSCODE", Modifier.fillMaxWidth(), Color(0xFFE5A00D), onFallback)
             }
         }
     }
