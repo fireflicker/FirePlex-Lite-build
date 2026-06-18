@@ -561,7 +561,13 @@ class PlexRepository(private val context: Context) {
 
     private fun plexTranscodeUrl(base: String, token: String, item: PlexMediaItem, directStream: Boolean): String {
         val metadataPath = item.key.takeIf { it.isNotBlank() } ?: "/library/metadata/${item.ratingKey}"
-        val directPlay = if (directStream) "0" else "0"
+
+        // Google TV / Fire Stick safe playback:
+        // - Always use HLS for ExoPlayer.
+        // - Force H264 video and AAC stereo audio when transcoding.
+        // - This avoids common no-sound / player-closes issues caused by DTS, TrueHD,
+        //   Atmos, DTS-HD, or unsupported passthrough tracks on cheap Android TV boxes.
+        val directPlay = "0"
         val directStreamValue = if (directStream) "1" else "0"
 
         return buildString {
@@ -571,14 +577,17 @@ class PlexRepository(private val context: Context) {
             append("&mediaIndex=0")
             append("&partIndex=0")
             append("&protocol=hls")
+            append("&container=mpegts")
             append("&fastSeek=1")
             append("&directPlay=$directPlay")
             append("&directStream=$directStreamValue")
-            append("&copyts=1")
+            append("&videoCodec=h264")
+            append("&audioCodec=aac")
+            append("&maxAudioChannels=2")
             append("&subtitleSize=100")
             append("&audioBoost=100")
-            append("&videoQuality=100")
-            append("&maxVideoBitrate=20000")
+            append("&videoQuality=80")
+            append("&maxVideoBitrate=12000")
             append("&location=lan")
             append("&X-Plex-Token=${encode(token)}")
         }
