@@ -1,10 +1,11 @@
 package com.fireflicker.fireplex2
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -14,6 +15,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -21,6 +25,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -124,6 +129,13 @@ fun ExoVideoPlayer(
     var durationMs by remember { mutableStateOf(0L) }
     var resumeAfterBackground by remember { mutableStateOf(false) }
     val initialPositionMs = remember(playUrl, subtitleUrl) { startPositionMs.coerceAtLeast(0L) }
+    val playerRootFocus = remember { FocusRequester() }
+    val rewindFocus = remember { FocusRequester() }
+    val playPauseFocus = remember { FocusRequester() }
+    val forwardFocus = remember { FocusRequester() }
+    val speedFocus = remember { FocusRequester() }
+    val subtitlesFocus = remember { FocusRequester() }
+    val startFocus = remember { FocusRequester() }
 
     val player = remember(playUrl, subtitleUrl, settings.preBufferSeconds) {
         val targetBufferMs = settings.preBufferSeconds.coerceIn(10, 60) * 1000
@@ -271,48 +283,53 @@ fun ExoVideoPlayer(
         onDispose { lifecycleOwner?.lifecycle?.removeObserver(observer) }
     }
 
+    LaunchedEffect(controlsVisible) {
+        if (controlsVisible) {
+            playPauseFocus.requestFocus()
+        } else {
+            playerRootFocus.requestFocus()
+        }
+    }
+
+    BackHandler(enabled = subtitlesOpen) {
+        subtitlesOpen = false
+    }
+
+    BackHandler(enabled = controlsVisible && !subtitlesOpen) {
+        controlsVisible = false
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .focusRequester(playerRootFocus)
             .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
                     Key.DirectionCenter, Key.Enter -> {
-                        if (controlsVisible) {
-                            if (player.isPlaying) player.pause() else player.play()
-                            updatePlayerState()
-                        } else {
+                        if (!controlsVisible) {
                             controlsVisible = true
+                            true
+                        } else {
+                            false
                         }
-                        true
                     }
-                    Key.DirectionLeft -> {
-                        controlsVisible = true
-                        player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
-                        updatePlayerState()
-                        true
-                    }
-                    Key.DirectionRight -> {
-                        controlsVisible = true
-                        player.seekTo(player.currentPosition + 30_000L)
-                        updatePlayerState()
-                        true
-                    }
-                    Key.DirectionUp -> {
-                        controlsVisible = true
-                        subtitlesOpen = true
-                        true
-                    }
-                    Key.DirectionDown -> {
-                        controlsVisible = !controlsVisible
-                        true
+                    Key.DirectionLeft, Key.DirectionRight, Key.DirectionUp, Key.DirectionDown -> {
+                        if (!controlsVisible) {
+                            controlsVisible = true
+                            true
+                        } else {
+                            false
+                        }
                     }
                     else -> false
                 }
             }
             .focusable()
-            .clickable { controlsVisible = !controlsVisible }
+            .pointerInput(Unit) {
+                detectTapGestures { controlsVisible = !controlsVisible }
+            }
     ) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -350,7 +367,9 @@ fun ExoVideoPlayer(
                         value = positionMs.coerceIn(0L, durationMs).toFloat(),
                         onValueChange = { player.seekTo(it.toLong()); updatePlayerState() },
                         valueRange = 0f..durationMs.toFloat(),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusProperties { canFocus = false }
                     )
                 }
 
@@ -362,18 +381,60 @@ fun ExoVideoPlayer(
                 Spacer(Modifier.height(10.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    FocusActionButton("-10", Modifier.width(78.dp), Color(0xAA203040)) { player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L)); updatePlayerState() }
-                    FocusActionButton(if (player.isPlaying) "PAUSE" else "PLAY", Modifier.width(110.dp), Color(0xFF00E676)) {
+                    FocusActionButton(
+                        "-10",
+                        Modifier
+                            .width(78.dp)
+                            .focusRequester(rewindFocus)
+                            .focusProperties { left = startFocus; right = playPauseFocus },
+                        Color(0xAA203040)
+                    ) { player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L)); updatePlayerState() }
+                    FocusActionButton(
+                        if (player.isPlaying) "PAUSE" else "PLAY",
+                        Modifier
+                            .width(110.dp)
+                            .focusRequester(playPauseFocus)
+                            .focusProperties { left = rewindFocus; right = forwardFocus },
+                        Color(0xFF00E676)
+                    ) {
                         if (player.isPlaying) player.pause() else player.play()
                         updatePlayerState()
                     }
-                    FocusActionButton("+30", Modifier.width(78.dp), Color(0xAA203040)) { player.seekTo(player.currentPosition + 30_000L); updatePlayerState() }
-                    FocusActionButton("SPEED ${speeds[speedIndex]}x", Modifier.width(140.dp), Color(0xAA203040)) {
+                    FocusActionButton(
+                        "+30",
+                        Modifier
+                            .width(78.dp)
+                            .focusRequester(forwardFocus)
+                            .focusProperties { left = playPauseFocus; right = speedFocus },
+                        Color(0xAA203040)
+                    ) { player.seekTo(player.currentPosition + 30_000L); updatePlayerState() }
+                    FocusActionButton(
+                        "SPEED ${speeds[speedIndex]}x",
+                        Modifier
+                            .width(140.dp)
+                            .focusRequester(speedFocus)
+                            .focusProperties { left = forwardFocus; right = subtitlesFocus },
+                        Color(0xAA203040)
+                    ) {
                         speedIndex = (speedIndex + 1) % speeds.size
                         player.setPlaybackSpeed(speeds[speedIndex])
                     }
-                    FocusActionButton("SUBS", Modifier.width(100.dp), Color(0xAA203040)) { subtitlesOpen = !subtitlesOpen }
-                    FocusActionButton("START", Modifier.width(100.dp), Color(0xAA203040)) { player.seekTo(0L); updatePlayerState() }
+                    FocusActionButton(
+                        "SUBS",
+                        Modifier
+                            .width(100.dp)
+                            .focusRequester(subtitlesFocus)
+                            .focusProperties { left = speedFocus; right = startFocus },
+                        Color(0xAA203040)
+                    ) { subtitlesOpen = !subtitlesOpen }
+                    FocusActionButton(
+                        "START",
+                        Modifier
+                            .width(100.dp)
+                            .focusRequester(startFocus)
+                            .focusProperties { left = subtitlesFocus; right = rewindFocus },
+                        Color(0xAA203040)
+                    ) { player.seekTo(0L); updatePlayerState() }
                 }
 
                 Spacer(Modifier.height(8.dp))
