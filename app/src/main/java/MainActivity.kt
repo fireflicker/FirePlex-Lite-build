@@ -350,6 +350,47 @@ fun FirePlexApp(repo: PlexRepository) {
         }
     }
 
+    fun preloadLibraryInBackground(library: PlexLibrary) {
+        if (library.key.isBlank()) return
+        if (preloadingLibraryKeys.contains(library.key)) return
+
+        scope.launch {
+            preloadingLibraryKeys = preloadingLibraryKeys + library.key
+            try {
+                val memoryItems = categoryMemoryCache[library.key].orEmpty()
+                val cachedItems = repo.cachedLibraryItems(library.key)
+                if (memoryItems.isNotEmpty() || cachedItems.isNotEmpty()) {
+                    val items = if (memoryItems.isNotEmpty()) memoryItems else cachedItems
+                    categoryMemoryCache = categoryMemoryCache + (library.key to items)
+                    val firstArtwork = loadArtwork(items.take(80))
+                    artworkUrls = artworkUrls + firstArtwork.first
+                    backdropUrls = backdropUrls + firstArtwork.second
+                    return@launch
+                }
+
+                val freshItems = repo.libraryItems(library)
+                if (freshItems.isNotEmpty()) {
+                    categoryMemoryCache = categoryMemoryCache + (library.key to freshItems)
+                    repo.saveLibraryCache(library.key, freshItems)
+
+                    val firstArtwork = loadArtwork(freshItems.take(80))
+                    artworkUrls = artworkUrls + firstArtwork.first
+                    backdropUrls = backdropUrls + firstArtwork.second
+
+                    // Continue generating the rest of the artwork URLs without blocking category opening.
+                    val remainingArtwork = loadArtwork(freshItems.drop(80))
+                    artworkUrls = artworkUrls + remainingArtwork.first
+                    backdropUrls = backdropUrls + remainingArtwork.second
+                }
+            } catch (_: Throwable) {
+                // Background preload must never break browsing.
+            } finally {
+                preloadingLibraryKeys = preloadingLibraryKeys - library.key
+            }
+        }
+    }
+
+
     fun updateContent() {
         scope.launch {
             loading = true
@@ -962,46 +1003,6 @@ fun FirePlexApp(repo: PlexRepository) {
             }
 
             loading = false
-        }
-    }
-
-    fun preloadLibraryInBackground(library: PlexLibrary) {
-        if (library.key.isBlank()) return
-        if (preloadingLibraryKeys.contains(library.key)) return
-
-        scope.launch {
-            preloadingLibraryKeys = preloadingLibraryKeys + library.key
-            try {
-                val memoryItems = categoryMemoryCache[library.key].orEmpty()
-                val cachedItems = repo.cachedLibraryItems(library.key)
-                if (memoryItems.isNotEmpty() || cachedItems.isNotEmpty()) {
-                    val items = if (memoryItems.isNotEmpty()) memoryItems else cachedItems
-                    categoryMemoryCache = categoryMemoryCache + (library.key to items)
-                    val firstArtwork = loadArtwork(items.take(80))
-                    artworkUrls = artworkUrls + firstArtwork.first
-                    backdropUrls = backdropUrls + firstArtwork.second
-                    return@launch
-                }
-
-                val freshItems = repo.libraryItems(library)
-                if (freshItems.isNotEmpty()) {
-                    categoryMemoryCache = categoryMemoryCache + (library.key to freshItems)
-                    repo.saveLibraryCache(library.key, freshItems)
-
-                    val firstArtwork = loadArtwork(freshItems.take(80))
-                    artworkUrls = artworkUrls + firstArtwork.first
-                    backdropUrls = backdropUrls + firstArtwork.second
-
-                    // Continue generating the rest of the artwork URLs without blocking category opening.
-                    val remainingArtwork = loadArtwork(freshItems.drop(80))
-                    artworkUrls = artworkUrls + remainingArtwork.first
-                    backdropUrls = backdropUrls + remainingArtwork.second
-                }
-            } catch (_: Throwable) {
-                // Background preload must never break browsing.
-            } finally {
-                preloadingLibraryKeys = preloadingLibraryKeys - library.key
-            }
         }
     }
 
