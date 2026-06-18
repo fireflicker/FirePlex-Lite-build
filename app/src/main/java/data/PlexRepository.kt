@@ -175,12 +175,12 @@ class PlexRepository(private val context: Context) {
 
     suspend fun streamMode(): String {
         return context.dataStore.data.first()[streamModeKey]
-            ?.takeIf { it == "direct_play" || it == "direct_stream" || it == "transcode" }
-            ?: "transcode"
+            ?.takeIf { it == "auto" || it == "direct_play" || it == "direct_stream" || it == "transcode" }
+            ?: "auto"
     }
 
     suspend fun saveStreamMode(mode: String) {
-        val clean = mode.lowercase().takeIf { it == "direct_play" || it == "direct_stream" || it == "transcode" } ?: "transcode"
+        val clean = mode.lowercase().takeIf { it == "auto" || it == "direct_play" || it == "direct_stream" || it == "transcode" } ?: "auto"
         context.dataStore.edit { prefs ->
             prefs[streamModeKey] = clean
         }
@@ -499,7 +499,7 @@ class PlexRepository(private val context: Context) {
         movies.flatMap { recentlyAdded(it) }
             .distinctBy { it.ratingKey }
             .sortedByNewest()
-            .take(50)
+            .take(30)
     }
 
     suspend fun recentlyAddedShows(libraries: List<PlexLibrary>): List<PlexMediaItem> = withContext(Dispatchers.IO) {
@@ -511,15 +511,12 @@ class PlexRepository(private val context: Context) {
 
         shows.flatMap { library ->
             val recentUrl = "${base.trimEnd('/')}/library/sections/${library.key}/recentlyAdded"
-            val episodeUrl = "${base.trimEnd('/')}/library/sections/${library.key}/all?type=4&sort=addedAt%3Adesc"
-            val recent = runCatching { PlexXmlParser.parseMediaItems(serverRequest(recentUrl, token)) }.getOrDefault(emptyList())
-            val episodes = runCatching { PlexXmlParser.parseMediaItems(serverRequest(episodeUrl, token)) }.getOrDefault(emptyList())
-            recent + episodes
+            runCatching { PlexXmlParser.parseMediaItems(serverRequest(recentUrl, token)) }.getOrDefault(emptyList())
         }
             .filter { it.type.equals("episode", ignoreCase = true) || it.type.equals("show", ignoreCase = true) || it.type.equals("video", ignoreCase = true) }
             .sortedByNewest()
             .distinctBy { item -> item.ratingKey.ifBlank { item.key.ifBlank { item.title.lowercase() } } }
-            .take(50)
+            .take(30)
     }
 
     suspend fun continueWatching(): List<PlexMediaItem> = withContext(Dispatchers.IO) {
@@ -552,6 +549,12 @@ class PlexRepository(private val context: Context) {
         when (mode) {
             "transcode" -> plexTranscodeUrl(base, token, item, directStream = false)
             "direct_stream" -> plexTranscodeUrl(base, token, item, directStream = true)
+            "auto" -> {
+                // Auto mode is tuned for Google TV / Fire TV.
+                // Use Plex universal HLS with direct stream first instead of raw file direct play.
+                // This keeps video mostly direct while allowing Plex/Exo to avoid unsupported containers/audio.
+                plexTranscodeUrl(base, token, item, directStream = true)
+            }
             else -> "${base.trimEnd('/')}${item.partKey}?X-Plex-Token=${encode(token)}"
         }
     }
@@ -563,9 +566,9 @@ class PlexRepository(private val context: Context) {
 
         // Google TV / Fire Stick safe playback:
         // - Always use HLS for ExoPlayer.
-        // - Force H264 video and AAC stereo audio when transcoding.
-        // - This avoids common no-sound / player-closes issues caused by DTS, TrueHD,
-        //   Atmos, DTS-HD, or unsupported passthrough tracks on cheap Android TV boxes.
+        // - Auto/direct_stream keeps video as direct as possible but asks Plex for AAC stereo audio.
+        // - Full transcode forces H264 + AAC when direct stream still fails.
+        // This avoids common no-sound/player-closes issues caused by DTS, TrueHD, DTS-HD, or Atmos.
         val directPlay = "0"
         val directStreamValue = if (directStream) "1" else "0"
 
@@ -580,9 +583,11 @@ class PlexRepository(private val context: Context) {
             append("&fastSeek=1")
             append("&directPlay=$directPlay")
             append("&directStream=$directStreamValue")
-            append("&videoCodec=h264")
             append("&audioCodec=aac")
             append("&maxAudioChannels=2")
+            if (!directStream) {
+                append("&videoCodec=h264")
+            }
             append("&subtitleSize=100")
             append("&audioBoost=100")
             append("&videoQuality=80")
