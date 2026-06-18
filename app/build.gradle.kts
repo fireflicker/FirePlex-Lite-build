@@ -13,8 +13,8 @@ android {
         applicationId = "com.fireflicker.fireplex2"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.0-unified"
+        versionCode = 5
+        versionName = "1.1-media3-player"
     }
 
     compileOptions {
@@ -41,6 +41,14 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Full Media3 playback stack - closer to the other app that plays more formats.
+    implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-datasource:$media3Version")
+    implementation("androidx.media3:media3-datasource-okhttp:$media3Version")
     implementation("androidx.media3:media3-exoplayer:$media3Version")
+    implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
+    implementation("androidx.media3:media3-exoplayer-dash:$media3Version")
+    implementation("androidx.media3:media3-exoplayer-rtsp:$media3Version")
+    implementation("androidx.media3:media3-extractor:$media3Version")
     implementation("androidx.media3:media3-ui:$media3Version")
 }
