@@ -38,3 +38,22 @@ The API key is currently hard-coded inside `AppAuthRepository.kt`. Anyone who ge
 - Settings includes Refresh Account.
 - Storage/media/microphone permissions are not requested.
 - Playback UI is separated into `PlayerScreen.kt`; device presets live in `DeviceProfiles.kt`.
+# FirePlex 1.0 Unified Stability Update
+
+- One universal APK; ABI split outputs removed.
+- One embedded player: Media3 EXO. Old VLC/MPV preferences are migrated to EXO.
+- Fixed continuous player reload caused by changing playback position in a `LaunchedEffect` key.
+- Debounced automatic EXO + Plex Transcode fallback.
+- Removed false `stopped` timeline reports during player recreation.
+- Playback timeline updates reduced from every second to every five seconds.
+- Added lifecycle-aware pause/resume when the app backgrounds or returns.
+- Removed forced stereo track filtering that could produce missing audio.
+- Added Plex client/session identity to HLS transcode requests.
+- Transcoding no longer requires a direct file `Part` key.
+- Removed automatic parallel full-library cache scans during content updates.
+- Limited background library preload to one library at a time.
+- Corrected TV episode display titles.
+- All screens use a compact density: 82% TV and 90% mobile.
+- Detail artwork hero reduced to 250dp.
+- Activity locked to landscape to avoid orientation recreation during playback.
+- Version: `1.0-unified` (`versionCode 4`).
