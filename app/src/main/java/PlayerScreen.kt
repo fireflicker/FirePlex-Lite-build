@@ -605,22 +605,20 @@ fun SubtitlePickerPanel(
             if (finderOpen) {
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                    TextField(
-                        value = subtitleQuery,
-                        onValueChange = {},
-                        modifier = Modifier.weight(1f).clickable { editingSubtitleTitle = true },
-                        readOnly = true,
-                        singleLine = true,
-                        label = { Text("Search title - press OK to edit") }
-                    )
-                    TextField(
-                        value = subtitleLanguage,
-                        onValueChange = {},
-                        modifier = Modifier.width(118.dp).clickable { editingSubtitleLanguage = true },
-                        readOnly = true,
-                        singleLine = true,
-                        label = { Text("Lang") }
-                    )
+                    FocusActionButton(
+                        "TITLE: ${subtitleQuery.take(24)}",
+                        Modifier.weight(1f),
+                        Color(0xAA203040)
+                    ) {
+                        editingSubtitleTitle = true
+                    }
+                    FocusActionButton(
+                        "LANG: ${subtitleLanguage.uppercase()}",
+                        Modifier.width(118.dp),
+                        Color(0xAA203040)
+                    ) {
+                        editingSubtitleLanguage = true
+                    }
                     FocusActionButton("SEARCH", Modifier.width(120.dp), Color(0xFF007C86)) {
                         scope.launch {
                             subtitleSearchStatus = "Searching OpenSubtitles..."
