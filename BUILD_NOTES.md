@@ -1,7 +1,7 @@
-[BUILD_NOTES.md](https://github.com/user-attachments/files/29152154/BUILD_NOTES.md)
+[BUILD_NOTES.md](https://github.com/user-attachments/files/29152638/BUILD_NOTES.md)
 # FirePlex Build Notes
 
-These notes apply to FirePlex `1.3-paged-room-cache` (`versionCode 7`).
+These notes apply to FirePlex `1.4-server-efficiency` (`versionCode 8`).
 
 ## Build Requirements
 
@@ -58,8 +58,8 @@ Important values are in `app/build.gradle.kts`:
 applicationId = "com.fireflicker.fireplex2"
 minSdk = 26
 targetSdk = 34
-versionCode = 7
-versionName = "1.3-paged-room-cache"
+versionCode = 8
+versionName = "1.4-server-efficiency"
 ```
 
 Increase `versionCode` for every distributed update. Change `versionName` to the user-facing release number.
