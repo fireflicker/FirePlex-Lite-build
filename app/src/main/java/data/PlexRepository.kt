@@ -132,6 +132,19 @@ class PlexRepository(private val context: Context) {
         }
     }
 
+    suspend fun clearLibraryCaches() {
+        val prefs = context.dataStore.data.first()
+        val cachedLibraryKeys = prefs.asMap().keys.filter { it.name.startsWith("cached_library_items_") }
+        if (cachedLibraryKeys.isEmpty()) return
+
+        context.dataStore.edit { edit ->
+            cachedLibraryKeys.forEach { key ->
+                @Suppress("UNCHECKED_CAST")
+                edit.remove(key as Preferences.Key<String>)
+            }
+        }
+    }
+
     suspend fun friendlyDeviceName(): String {
         return context.dataStore.data.first()[friendlyDeviceNameKey]
             ?.takeIf { it.isNotBlank() }
