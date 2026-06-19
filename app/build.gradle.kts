@@ -13,8 +13,8 @@ android {
         applicationId = "com.fireflicker.fireplex2"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.1-media3-player"
+        versionCode = 6
+        versionName = "1.2-cinematic-ui"
     }
 
     compileOptions {
