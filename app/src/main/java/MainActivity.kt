@@ -80,6 +80,15 @@ enum class AppDisplayMode {
     Mobile
 }
 
+val TvBg = Color(0xFF05080D)
+val TvPanel = Color(0xE80B121D)
+val TvPanelSoft = Color(0xCC101A26)
+val TvNormal = Color(0xFF16202A)
+val TvFocused = Color(0xFF00FF66)
+val TvFocusedDark = Color(0xFF00C853)
+val TvSelected = Color(0xFFFFB000)
+val TvMuted = Color(0xFFB7C7D8)
+
 @Composable
 fun cachedImageModel(url: String): Any? {
     if (url.isBlank()) return null
@@ -2269,48 +2278,149 @@ fun TvHomeScreen(
 ) {
     val vodEnabled = !allLibrariesHidden && libraries.any { it.type.equals("movie", true) }
     val seriesEnabled = !allLibrariesHidden && libraries.any { it.type.equals("show", true) || it.type.equals("tv", true) }
+    val hero = remember(continueWatching, recentlyMovies, recentlyShows) {
+        continueWatching.firstOrNull() ?: recentlyMovies.firstOrNull() ?: recentlyShows.firstOrNull()
+    }
+    val heroArt = hero?.let { artworkUrls[it.ratingKey].orEmpty() }.orEmpty()
 
-    Column(modifier = Modifier.fillMaxSize().padding(10.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(
                     painter = painterResource(id = R.drawable.app_logo),
                     contentDescription = "FirePlex logo",
-                    modifier = Modifier.size(56.dp),
+                    modifier = Modifier.height(42.dp).width(150.dp),
                     contentScale = ContentScale.Fit
                 )
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("FirePlex", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-                    Text("$serverName  •  $friendlyName", color = Color(0xFFB7C7D8), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(cacheLabel(cachedAt), color = Color(0xFF00E676), fontSize = 12.sp)
+                Spacer(Modifier.width(24.dp))
+                HomeNavPill("MOVIES", vodEnabled, onOpenVod)
+                HomeNavPill("TV SERIES", seriesEnabled, onOpenSeries)
+                HomeNavPill("FAVOURITES", true, onOpenFavorites)
+                HomeNavPill("GLOBAL SEARCH", vodEnabled || seriesEnabled, onOpenSearch)
+                HomeNavPill("SETTINGS", true, onOpenSettings)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(friendlyName.ifBlank { "FirePlex" }, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(cacheLabel(cachedAt), color = TvFocused, fontSize = 11.sp, maxLines = 1)
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth().height(235.dp),
+            colors = CardDefaults.cardColors(containerColor = TvPanel),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, Color(0x223A4A5B))
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                if (heroArt.isNotBlank()) {
+                    AsyncImage(
+                        model = cachedImageModel(heroArt),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xF405080D), Color(0xCC05080D), Color(0x3305080D)))))
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF005080D)))))
+                } else {
+                    Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xFF07111D), Color(0xFF102236), Color(0xFF05080D)))))
+                }
+                Row(Modifier.fillMaxSize().padding(22.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("HOME", color = TvFocused, fontSize = 13.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(hero?.title ?: "FirePlex Lite", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(8.dp))
+                        Text(hero?.let { mediaMetaLine(it) } ?: "$serverName  •  Fast TV mode", color = TvMuted, fontSize = 14.sp, maxLines = 1)
+                        Spacer(Modifier.height(10.dp))
+                        Text(hero?.summary?.ifBlank { status } ?: status, color = Color(0xFFDCE5EE), fontSize = 14.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 620.dp))
+                    }
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        HomeHeroButton(if (hero?.viewOffsetMs ?: 0L > 0L) "CONTINUE" else "PLAY", hero != null) { hero?.let(onSelectDetails) }
+                        HomeHeroButton("UPDATE", true, onOpenUpdate)
+                    }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                LobbySmallButton("UPDATE") { onOpenUpdate() }
-                LobbySmallButton("SETTINGS") { onOpenSettings() }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Text(if (loading) "Loading..." else status, color = TvMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(12.dp))
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            item {
+                if (continueWatching.isNotEmpty()) {
+                    TvPosterRow("CONTINUE WATCHING", continueWatching.take(12), artworkUrls, favoriteKeys, onSelectDetails, onToggleFavorite)
+                }
+            }
+            item {
+                TvPosterRow("RECENTLY ADDED MOVIES", recentlyMovies.take(16), artworkUrls, favoriteKeys, onSelectDetails, onToggleFavorite)
+            }
+            item {
+                TvPosterRow("RECENTLY ADDED TV SERIES", recentlyShows.take(16), artworkUrls, favoriteKeys, onSelectDetails, onToggleFavorite)
+            }
+            item {
+                if (favoriteItems.isNotEmpty()) {
+                    TvPosterRow("FAVOURITES", favoriteItems.take(16), artworkUrls, favoriteKeys, onSelectDetails, onToggleFavorite)
+                }
             }
         }
+    }
+}
 
-        Spacer(Modifier.height(18.dp))
-
-        Spacer(Modifier.height(24.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TvQuickTile("MOVIES", "Films", "▶", vodEnabled, Modifier.weight(1f)) { onOpenVod() }
-            TvQuickTile("SERIES", "TV Shows", "▦", seriesEnabled, Modifier.weight(1f)) { onOpenSeries() }
-            TvQuickTile("FAVOURITES", "Saved", "★", true, Modifier.weight(1f)) { onOpenFavorites() }
-            TvQuickTile("GLOBAL SEARCH", "Movies + TV", "⌕", vodEnabled || seriesEnabled, Modifier.weight(1f)) { onOpenSearch() }
+@Composable
+fun HomeNavPill(text: String, enabled: Boolean = true, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier
+            .padding(horizontal = 4.dp)
+            .height(42.dp)
+            .widthIn(min = 88.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .focusable(enabled)
+            .tvRemoteClick(enabled = enabled, onClick = onClick),
+        color = when {
+            focused -> TvFocused
+            else -> Color.Transparent
+        },
+        shape = RoundedCornerShape(12.dp),
+        border = if (!focused) BorderStroke(1.dp, Color.Transparent) else null
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+            Text(text, color = if (focused) Color.Black else if (enabled) Color.White else Color(0xFF6D7785), fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
         }
+    }
+}
 
-        Spacer(Modifier.height(20.dp))
-        Text(if (loading) "Loading..." else status, color = Color(0xFFB7C7D8), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-        Spacer(Modifier.weight(1f))
+@Composable
+fun HomeHeroButton(text: String, enabled: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier
+            .width(150.dp)
+            .height(46.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .focusable(enabled)
+            .tvRemoteClick(enabled = enabled, onClick = onClick),
+        color = if (focused) TvFocused else Color(0xCC16202A),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, if (focused) TvFocused else Color(0x664B5C70))
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(text, color = if (focused) Color.Black else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Black)
+        }
     }
 }
 
@@ -2326,35 +2436,24 @@ fun TvQuickTile(
     var focused by remember { mutableStateOf(false) }
     Card(
         modifier = modifier
-            .height(if (focused) 138.dp else 128.dp)
+            .height(if (focused) 148.dp else 138.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable(enabled)
             .tvRemoteClick(enabled = enabled, onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF173B28) else Color(0xE9141720)),
-        border = BorderStroke(if (focused) 4.dp else 1.dp, if (focused) Color(0xFF00FF66) else Color(0x44FFFFFF)),
-        shape = RoundedCornerShape(24.dp)
+        colors = CardDefaults.cardColors(containerColor = if (focused) TvFocused else TvNormal),
+        border = BorderStroke(2.dp, if (focused) TvFocused else Color(0x334B5C70)),
+        shape = RoundedCornerShape(22.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            if (focused) Color(0xFF00A843) else Color(0xFF182231),
-                            if (focused) Color(0xFF0A2014) else Color(0xFF0B1018)
-                        )
-                    )
-                )
-                .padding(18.dp)
-        ) {
-            Text(icon, color = if (enabled) Color(0xFF00FF66) else Color(0xFF6D7785), fontSize = 44.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.TopEnd))
+        Box(Modifier.fillMaxSize().background(if (focused) Brush.horizontalGradient(listOf(TvFocused, TvFocusedDark)) else Brush.horizontalGradient(listOf(Color(0xFF182331), Color(0xFF0B1018)))).padding(18.dp)) {
+            Text(icon, color = if (focused) Color.Black else TvFocused, fontSize = 42.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.TopEnd))
             Column(modifier = Modifier.align(Alignment.BottomStart)) {
-                Text(title, color = if (enabled) Color.White else Color(0xFF6D7785), fontSize = 25.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                Text(subtitle.uppercase(), color = if (focused) Color(0xFFCCFFE0) else Color(0xFFB7C7D8), fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, color = if (focused) Color.Black else Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                Text(subtitle.uppercase(), color = if (focused) Color(0xFF02200E) else TvMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
 }
+
 @Composable
 fun TvPosterRow(
     title: String,
@@ -2404,13 +2503,9 @@ fun ContentBrowseScreen(
     onSelectDetails: (PlexMediaItem) -> Unit
 ) {
     val movieMode = mode == ContentMode.Vod
-    val title = if (movieMode) "MOVIES" else "SERIES"
+    val title = if (movieMode) "MOVIES" else "TV SERIES"
     val modeLibraries = libraries.filter {
-        if (movieMode) {
-            it.type.equals("movie", true)
-        } else {
-            it.type.equals("show", true) || it.type.equals("tv", true)
-        }
+        if (movieMode) it.type.equals("movie", true) else it.type.equals("show", true) || it.type.equals("tv", true)
     }
     val recent = if (movieMode) recentlyMovies else recentlyShows
     val libraryByKey = remember(modeLibraries) { modeLibraries.associateBy { it.key } }
@@ -2422,138 +2517,96 @@ fun ContentBrowseScreen(
     var searchText by remember { mutableStateOf("") }
 
     val selectedCategoryTitle = when (selectedCategory) {
-        "FAVORITES" -> "FAVORITES"
+        "FAVORITES" -> "FAVOURITES"
         "RECENTLY ADDED" -> "RECENTLY ADDED"
         "CONTINUE WATCHING" -> "CONTINUE WATCHING"
         else -> libraryByKey[selectedCategory]?.title?.uppercase() ?: selectedCategory
     }
 
     LaunchedEffect(selectedCategory, modeLibraries) {
-        delay(900)
+        delay(750)
         val selectedIndex = modeLibraries.indexOfFirst { it.key == selectedCategory }
         val nextLibrary = when {
             selectedIndex >= 0 -> modeLibraries.getOrNull(selectedIndex + 1)
             selectedCategory == "RECENTLY ADDED" || selectedCategory == "CONTINUE WATCHING" -> modeLibraries.firstOrNull()
             else -> null
         }
-        if (nextLibrary != null) {
-            onPreloadLibrary(nextLibrary)
-        }
+        if (nextLibrary != null) onPreloadLibrary(nextLibrary)
     }
 
     val baseGridItems = when (selectedCategory) {
-        "CONTINUE WATCHING" -> continueWatching
+        "CONTINUE WATCHING" -> continueWatching.filter { itemMatchesMode(it, mode) }
         "FAVORITES" -> favoriteItems.filter { itemMatchesMode(it, mode) }
         "RECENTLY ADDED" -> recent
         else -> if (libraryByKey.containsKey(selectedCategory)) categoryItems else recent
     }
 
     val visibleGridItems = remember(selectedCategory, mediaItemsFingerprint(baseGridItems), searchText, sortNewestFirst, sortAz) {
-        val searched = if (searchText.isBlank()) {
-            baseGridItems
-        } else {
-            baseGridItems.filter { it.title.contains(searchText, ignoreCase = true) }
-        }
-
-        if (sortAz) searched.sortedBy { it.title.lowercase() }
-        else if (sortNewestFirst) searched.sortedByDescending { it.addedAt }
-        else searched.sortedBy { it.addedAt }
+        val searched = if (searchText.isBlank()) baseGridItems else baseGridItems.filter { it.title.contains(searchText, ignoreCase = true) }
+        if (sortAz) searched.sortedBy { it.title.lowercase() } else if (sortNewestFirst) searched.sortedByDescending { it.addedAt } else searched.sortedBy { it.addedAt }
     }
 
-    Row(modifier = Modifier.fillMaxSize()) {
+    Row(modifier = Modifier.fillMaxSize().padding(10.dp)) {
         LazyColumn(
-            modifier = Modifier
-                .width(250.dp)
-                .fillMaxHeight()
-                .background(Color(0x77000000))
-                .padding(top = 8.dp, end = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
+            modifier = Modifier.width(235.dp).fillMaxHeight().background(Color(0xAA07111D), RoundedCornerShape(18.dp)).padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             item {
-                Column {
-                    Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text(cacheLabel(cachedAt), color = Color(0xFF00E676), fontSize = 10.sp)
-                    Spacer(Modifier.height(6.dp))
-                }
+                Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Black)
+                Text(cacheLabel(cachedAt), color = TvFocused, fontSize = 10.sp)
+                Spacer(Modifier.height(8.dp))
             }
-
-            item { VodSeriesMenuItem("FAVORITES", selectedCategory == "FAVORITES") { selectedCategory = "FAVORITES" } }
+            item { VodSeriesMenuItem("FAVOURITES", selectedCategory == "FAVORITES") { selectedCategory = "FAVORITES" } }
             item { VodSeriesMenuItem("RECENTLY ADDED", selectedCategory == "RECENTLY ADDED") { selectedCategory = "RECENTLY ADDED" } }
             item { VodSeriesMenuItem("CONTINUE WATCHING", selectedCategory == "CONTINUE WATCHING") { selectedCategory = "CONTINUE WATCHING" } }
-
             items(modeLibraries, key = { it.key }) { library ->
                 VodSeriesMenuItem(library.title.uppercase(), selectedCategory == library.key) {
                     selectedCategory = library.key
                     onOpenLibrary(library)
                 }
             }
-
             item { Spacer(Modifier.height(10.dp)) }
             item { VodSeriesMenuItem("UPDATE CONTENTS", false, onOpenUpdate) }
             item { VodSeriesMenuItem("SETTINGS", false, onOpenSettings) }
         }
 
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(14.dp))
 
         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(62.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.fillMaxWidth().height(62.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 if (searchOpen) {
-                    TextField(
-                        value = searchText,
-                        onValueChange = { searchText = it },
-                        modifier = Modifier.weight(1f).height(58.dp),
-                        singleLine = true,
-                        label = { Text("Search") }
-                    )
+                    TextField(value = searchText, onValueChange = { searchText = it }, modifier = Modifier.weight(1f).height(56.dp), singleLine = true, label = { Text("Search $title") })
                     Spacer(Modifier.width(12.dp))
-                    FocusActionButton("CLOSE", Modifier.width(104.dp), Color(0xFF203040)) {
-                        searchOpen = false
-                        searchText = ""
-                    }
+                    FocusActionButton("CLOSE", Modifier.width(104.dp), TvNormal) { searchOpen = false; searchText = "" }
                 } else {
                     Column {
-                        Text(selectedCategoryTitle, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Light)
-                        Text("CATEGORIES", color = Color(0xFF00E676), fontSize = 11.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                        Text(selectedCategoryTitle, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                        Text("REMOTE MENU = FAVOURITE  •  OK = OPEN", color = TvFocused, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
-
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        FocusActionButton(if (sortNewestFirst) "NEW\nOLD" else "OLD\nNEW", Modifier.width(78.dp), Color(0x66111820)) { sortNewestFirst = !sortNewestFirst; sortAz = false }
-                        FocusActionButton("A-Z", Modifier.width(70.dp), Color(0x66111820)) { sortAz = !sortAz }
-                        FocusActionButton("SEARCH", Modifier.width(112.dp), Color(0x66111820)) { searchOpen = true }
+                        FocusActionButton(if (sortNewestFirst) "NEW" else "OLD", Modifier.width(78.dp), TvNormal) { sortNewestFirst = !sortNewestFirst; sortAz = false }
+                        FocusActionButton("A-Z", Modifier.width(70.dp), if (sortAz) TvSelected else TvNormal) { sortAz = !sortAz }
+                        FocusActionButton("SEARCH", Modifier.width(112.dp), TvNormal) { searchOpen = true }
                     }
                 }
             }
 
-            Text(if (loading) "Loading..." else if (loadingMore) "$status  Loading more in background..." else status, color = Color(0xFFB7C7D8), fontSize = 11.sp)
+            Text(if (loading) "Loading..." else if (loadingMore) "$status  Loading more in background..." else status, color = TvMuted, fontSize = 11.sp)
             Spacer(Modifier.height(8.dp))
 
             if (visibleGridItems.isEmpty()) {
                 EmptyPanel(if (loading) "Loading..." else "Nothing found in this section.")
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 112.dp),
+                    columns = GridCells.Adaptive(minSize = 118.dp),
                     modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    gridItems(visibleGridItems, key = { it.ratingKey.ifBlank { it.key } }) { item ->
-                        MediaPosterCard(
-                            item = item,
-                            artworkUrl = artworkUrls[item.ratingKey].orEmpty(),
-                            isFavorite = favoriteKeys.contains(mediaItemStableId(item)),
-                            onClick = { onSelectDetails(item) },
-                            onLongClick = { onToggleFavorite(item) }
-                        )
+                    gridItems(visibleGridItems, key = { mediaItemStableId(it) }) { item ->
+                        MediaPosterCard(item = item, artworkUrl = artworkUrls[item.ratingKey].orEmpty(), isFavorite = favoriteKeys.contains(mediaItemStableId(item)), onClick = { onSelectDetails(item) }, onLongClick = { onToggleFavorite(item) })
                     }
-                    if (loadingMore) {
-                        item {
-                            LoadingMoreTile()
-                        }
-                    }
+                    if (loadingMore) item { LoadingMoreTile() }
                 }
             }
         }
@@ -2585,36 +2638,29 @@ fun LoadingMoreTile() {
 @Composable
 fun VodSeriesMenuItem(text: String, selected: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val active = focused || selected
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 40.dp)
+            .heightIn(min = 42.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .tvRemoteClick(onClick = onClick),
         color = when {
-            focused -> Color(0xFF24323D)
-            selected -> Color(0xFF17232C)
+            focused -> TvFocused
+            selected -> Color(0xFF233647)
             else -> Color.Transparent
         },
-        border = if (focused) BorderStroke(2.dp, Color(0xFF00E676)) else null,
-        shape = RoundedCornerShape(6.dp)
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, if (focused) TvFocused else if (selected) TvSelected else Color.Transparent)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .width(5.dp)
-                    .height(30.dp)
-                    .background(if (active) Color(0xFF00E676) else Color.Transparent)
-            )
+            Box(modifier = Modifier.width(5.dp).height(32.dp).background(if (selected && !focused) TvSelected else Color.Transparent))
             Text(
                 text = text,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                color = if (focused) Color.White else if (selected) Color(0xFF00E676) else Color(0xFFE4E9EE),
-                fontSize = if (active) 16.sp else 15.sp,
-                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                color = if (focused) Color.Black else if (selected) TvSelected else Color.White,
+                fontSize = if (focused || selected) 16.sp else 15.sp,
+                fontWeight = if (focused || selected) FontWeight.Black else FontWeight.Normal,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -3231,46 +3277,44 @@ fun MediaDetailsScreen(
     playerChoice: PlayerChoice,
     onPlay: (PlexMediaItem, PlexSubtitleTrack?, Boolean) -> Unit
 ) {
-    var subtitle by remember(item) { mutableStateOf(item.subtitles.firstOrNull { it.selected }) }
-
-    LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        item {
-            Box(modifier = Modifier.fillMaxWidth().height(250.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF111820))) {
-                if (backdropUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = cachedImageModel(backdropUrl),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x22000000), Color(0xDD000000)))))
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (backdropUrl.isNotBlank()) {
+            AsyncImage(model = cachedImageModel(backdropUrl), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xF405080D), Color(0xE805080D), Color(0x6605080D)))))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x22000000), Color(0xF205080D)))))
+        }
+        Row(modifier = Modifier.fillMaxSize().padding(26.dp), verticalAlignment = Alignment.CenterVertically) {
+            Card(
+                modifier = Modifier.width(230.dp).height(345.dp),
+                colors = CardDefaults.cardColors(containerColor = TvPanel),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, Color(0x664B5C70))
+            ) {
+                if (artworkUrl.isNotBlank()) {
+                    AsyncImage(model = cachedImageModel(artworkUrl), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                } else {
+                    Box(Modifier.fillMaxSize().background(TvNormal), contentAlignment = Alignment.Center) {
+                        Text(item.title.take(1).uppercase(), color = TvFocused, fontSize = 56.sp, fontWeight = FontWeight.Black)
+                    }
                 }
-                Column(modifier = Modifier.align(Alignment.BottomStart).padding(22.dp)) {
-                    Text(item.title.ifBlank { "Untitled" }, color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(28.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                Text(item.title.ifBlank { "Untitled" }, color = Color.White, fontSize = 44.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(8.dp))
+                Text(mediaMetaLine(item), color = TvFocused, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(18.dp))
+                Text(item.summary.ifBlank { "No summary available." }, color = Color(0xFFD7DEE8), fontSize = 16.sp, lineHeight = 22.sp, maxLines = 6, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 760.dp))
+                Spacer(Modifier.height(22.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FocusActionButton(if (item.viewOffsetMs > 0L) "CONTINUE" else "PLAY", Modifier.width(160.dp), TvFocused) { onPlay(item, null, false) }
                     if (item.viewOffsetMs > 0L) {
-                        Text("Continue watching available", color = Color(0xFF00E676), fontSize = 14.sp)
+                        FocusActionButton("PLAY FROM START", Modifier.width(190.dp), TvNormal) { onPlay(item, null, true) }
                     }
                 }
+                Spacer(Modifier.height(12.dp))
+                Text("Audio and subtitles are inside the video player. MENU on posters adds favourites.", color = TvMuted, fontSize = 13.sp)
             }
-        }
-
-        item {
-            Text(item.summary.ifBlank { "No summary available." }, color = Color(0xFFD7DEE8), fontSize = 15.sp)
-        }
-
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                Button(onClick = { onPlay(item, null, false) }, modifier = Modifier.weight(1f)) {
-                    Text(if (item.viewOffsetMs > 0L) "Continue Watching" else "Play")
-                }
-                if (item.viewOffsetMs > 0L) {
-                    OutlinedButton(onClick = { onPlay(item, null, true) }, modifier = Modifier.weight(1f)) {
-                        Text("Play From Start")
-                    }
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Text("Subtitles and audio options are inside the video player.", color = Color(0xFFB7C7D8), fontSize = 13.sp)
         }
     }
 }
@@ -3369,45 +3413,42 @@ fun MediaPosterCard(
     onLongClick: () -> Unit = {}
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scaleWidth = if (focused) 124.dp else 116.dp
-    val scaleHeight = if (focused) 186.dp else 176.dp
-
+    val w = if (focused) 132.dp else 122.dp
+    val h = if (focused) 202.dp else 188.dp
     Card(
         modifier = Modifier
-            .width(scaleWidth)
-            .height(scaleHeight)
+            .width(w)
+            .height(h)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .tvRemoteClick(onClick = onClick, onLongClick = onLongClick)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF17222D) else Color(0xF2111820)),
-        border = if (focused) BorderStroke(3.dp, Color(0xFF00E676)) else null,
-        shape = RoundedCornerShape(10.dp)
+        colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF0B2415) else TvPanel),
+        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) TvFocused else Color(0x334B5C70)),
+        shape = RoundedCornerShape(14.dp)
     ) {
         Column {
-            Box(modifier = Modifier.fillMaxWidth().height(116.dp).background(Color(0xFF1A2028)), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxWidth().height(if (focused) 132.dp else 122.dp).background(TvNormal), contentAlignment = Alignment.Center) {
                 if (artworkUrl.isNotBlank()) {
                     AsyncImage(model = cachedImageModel(artworkUrl), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
-                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = Color(0xFF00E676), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = TvFocused, fontSize = 24.sp, fontWeight = FontWeight.Black)
                 }
                 if (isFavorite) {
-                    Text(
-                        "★",
-                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
-                        color = Color(0xFF00E676),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("★", modifier = Modifier.align(Alignment.TopEnd).padding(6.dp), color = TvSelected, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                }
+                if (focused) {
+                    Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(TvFocused))
                 }
             }
-            Column(Modifier.padding(7.dp)) {
-                Text(item.title.ifBlank { "Untitled" }, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(mediaMetaLine(item), color = Color(0xFF00E676), fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.padding(8.dp)) {
+                Text(item.title.ifBlank { "Untitled" }, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(mediaMetaLine(item), color = if (focused) TvFocused else TvMuted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
 }
+
 @Composable
 fun SectionTitle(text: String) {
     Text(text, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -3440,28 +3481,23 @@ fun SettingsTile(title: String, icon: String, modifier: Modifier = Modifier, onC
     var focused by remember { mutableStateOf(false) }
     Card(
         modifier = modifier
-            .height(178.dp)
+            .height(150.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .tvRemoteClick(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF203040) else Color(0xE90B0D25)),
-        border = BorderStroke(if (focused) 5.dp else 1.dp, if (focused) Color(0xFF00FF66) else Color(0xFF273553)),
-        shape = RoundedCornerShape(14.dp)
+        colors = CardDefaults.cardColors(containerColor = if (focused) TvFocused else TvNormal),
+        border = BorderStroke(1.dp, if (focused) TvFocused else Color(0x334B5C70)),
+        shape = RoundedCornerShape(16.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(if (focused) Color(0x2229D3FF) else Color.Transparent)
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(icon, color = if (focused) Color(0xFF00FF66) else Color(0xFFD9DEE8), fontSize = if (focused) 54.sp else 48.sp, fontWeight = FontWeight.Light)
-            Spacer(Modifier.height(12.dp))
-            Text(title, color = if (focused) Color(0xFFE8FFF0) else Color.White, fontSize = if (focused) 16.sp else 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (focused) {
-                Spacer(Modifier.height(8.dp))
-                Text("OK", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.background(Color(0xFF00FF66), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 3.dp))
+            Text(icon, color = if (focused) Color.Black else TvFocused, fontSize = 38.sp, fontWeight = FontWeight.Black)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = if (focused) Color.Black else Color.White, fontSize = 17.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("Press OK", color = if (focused) Color(0xFF073A18) else TvMuted, fontSize = 11.sp)
             }
         }
     }
@@ -3576,100 +3612,27 @@ fun FocusOptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 fun FocusActionButton(text: String, modifier: Modifier = Modifier, color: Color, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val normalColor = when (color) {
-        Color(0xFF00E676), Color(0xFF00FF66) -> Color(0xFF244131)
-        Color(0xFF007C86) -> Color(0xFF123642)
+    val bg = when {
+        focused -> TvFocused
+        color == TvFocused || color == Color(0xFF00E676) || color == Color(0xFF00FF66) -> Color(0xFF1A2D20)
         else -> color
     }
     Surface(
         modifier = modifier
-            .height(if (focused) 56.dp else 52.dp)
+            .height(42.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .tvRemoteClick(onClick = onClick),
-        color = if (focused) Color(0xFF00FF66) else normalColor,
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(if (focused) 4.dp else 1.dp, if (focused) Color(0xFF001A0A) else Color(0x55566678))
+        color = bg,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, if (focused) TvFocused else Color(0x334B5C70))
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(text, color = if (focused) Color.Black else Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+            Text(text, color = if (focused) Color.Black else Color.White, fontWeight = FontWeight.Black, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 2)
         }
     }
 }
 
-@Composable
-fun EmptyPanel(text: String) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xF2111820)), shape = RoundedCornerShape(16.dp)) {
-        Text(text = text, modifier = Modifier.padding(18.dp), color = Color(0xFFB7C7D8), textAlign = TextAlign.Center)
-    }
-}
-
-@Composable
-fun LibraryPosterCard(library: PlexLibrary, onOpen: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier
-            .width(if (focused) 178.dp else 170.dp)
-            .height(if (focused) 240.dp else 230.dp)
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable { onOpen() },
-        colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF17222D) else Color(0xF2111820)),
-        border = if (focused) BorderStroke(3.dp, Color(0xFF00E676)) else null,
-        shape = RoundedCornerShape(18.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF4A3208), Color(0xFF111820), Color(0xFF050608)))).padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            Column {
-                Text(library.title.ifBlank { "Library" }, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(6.dp))
-                Text(library.type.ifBlank { "category" }, color = Color(0xFF00E676), fontSize = 12.sp)
-            }
-            Text(if (focused) "Press OK" else "Open", color = Color(0xFF00E676), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-@Composable
-fun MediaWideRow(item: PlexMediaItem, artworkUrl: String, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .focusable(),
-        colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF17222D) else Color(0xF2111820)),
-        border = if (focused) BorderStroke(3.dp, Color(0xFF00E676)) else null,
-        shape = RoundedCornerShape(18.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(if (focused) 18.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(width = 116.dp, height = 78.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF1A2028)), contentAlignment = Alignment.Center) {
-                if (artworkUrl.isNotBlank()) {
-                    AsyncImage(model = cachedImageModel(artworkUrl), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                } else {
-                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = Color(0xFF00E676), fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            Spacer(Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(item.title.ifBlank { "Untitled" }, color = Color.White, fontSize = if (focused) 21.sp else 19.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(mediaMetaLine(item), color = Color(0xFF00E676), fontSize = 13.sp)
-
-                if (item.summary.isNotBlank()) {
-                    Spacer(Modifier.height(5.dp))
-                    Text(item.summary, color = Color(0xFFB7C7D8), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-            }
-
-            if (focused) {
-                Spacer(Modifier.width(12.dp))
-                Text("OK", color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.background(Color(0xFF00E676), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp))
-            }
-        }
-    }
-}
 fun mediaMetaLine(item: PlexMediaItem): String {
     return listOf(
         item.year,
