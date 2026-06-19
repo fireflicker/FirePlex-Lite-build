@@ -16,5 +16,8 @@ data class PlexMediaItem(
     val viewOffsetMs: Long,
     val addedAt: Long,
     val partKey: String,
-    val subtitles: List<PlexSubtitleTrack>
+    val subtitles: List<PlexSubtitleTrack>,
+    val rating: String = "",
+    val audienceRating: String = "",
+    val tagline: String = ""
 )
