@@ -60,7 +60,10 @@ object PlexXmlParser {
                             viewOffsetMs = parser.attr("viewOffset").toLongOrNull() ?: 0L,
                             addedAt = parser.attr("addedAt").toLongOrNull() ?: 0L,
                             partKey = "",
-                            subtitles = emptyList()
+                            subtitles = emptyList(),
+                            rating = parser.attr("rating"),
+                            audienceRating = parser.attr("audienceRating"),
+                            tagline = parser.attr("tagline")
                         )
                     )
                 }
@@ -91,7 +94,10 @@ object PlexXmlParser {
                     contentRating = parser.attr("contentRating"),
                     durationMs = parser.attr("duration").toLongOrNull() ?: 0L,
                     viewOffsetMs = parser.attr("viewOffset").toLongOrNull() ?: 0L,
-                    addedAt = parser.attr("addedAt").toLongOrNull() ?: 0L
+                    addedAt = parser.attr("addedAt").toLongOrNull() ?: 0L,
+                    rating = parser.attr("rating"),
+                    audienceRating = parser.attr("audienceRating"),
+                    tagline = parser.attr("tagline")
                 )
             }
 
@@ -135,7 +141,10 @@ object PlexXmlParser {
                             viewOffsetMs = item.viewOffsetMs,
                             addedAt = item.addedAt,
                             partKey = item.partKey,
-                            subtitles = item.subtitles
+                            subtitles = item.subtitles,
+                            rating = item.rating,
+                            audienceRating = item.audienceRating,
+                            tagline = item.tagline
                         )
                     )
                 }
@@ -165,6 +174,9 @@ object PlexXmlParser {
         val viewOffsetMs: Long,
         val addedAt: Long,
         var partKey: String = "",
-        val subtitles: MutableList<PlexSubtitleTrack> = mutableListOf()
+        val subtitles: MutableList<PlexSubtitleTrack> = mutableListOf(),
+        val rating: String = "",
+        val audienceRating: String = "",
+        val tagline: String = ""
     )
 }
