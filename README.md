@@ -1,12 +1,12 @@
-[README.md](https://github.com/user-attachments/files/29152150/README.md)
+[README.md](https://github.com/user-attachments/files/29152655/README.md)
 # FirePlex
 
 FirePlex is an unofficial Android TV media client for browsing and playing content from a personal Plex Media Server. It is designed for televisions and remote controls, with a compact media interface, cached library browsing, and one built-in Media3 player.
 
 ## Current Release
 
-- Version name: `1.3-paged-room-cache`
-- Version code: `7`
+- Version name: `1.4-server-efficiency`
+- Version code: `8`
 - Android package: `com.fireflicker.fireplex2`
 - Minimum Android version: Android 8.0 (`API 26`)
 - Target Android version: Android 14 (`API 34`)
@@ -20,6 +20,8 @@ FirePlex is an unofficial Android TV media client for browsing and playing conte
 - Rechecks the player account so expired or disabled accounts can be refused.
 - Displays movie and TV libraries, posters, backdrops, metadata, seasons, and episodes.
 - Includes Recently Added Movies, Recently Added TV, Continue Watching, favourites, and global search.
+- Builds Recently Added TV series cards from Plex episode metadata without issuing a metadata request for every show.
+- Uses limited global Recently Added requests with a per-library fallback to reduce Plex server load.
 - Provides separate VOD and Series browsing with category navigation.
 - Saves library data locally so the home screen can open from cache.
 - Loads Plex libraries in 80-item pages and automatically requests the next page near the grid's end.
