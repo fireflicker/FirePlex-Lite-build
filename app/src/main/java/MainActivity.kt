@@ -61,6 +61,8 @@ import com.fireflicker.fireplex2.data.PlexMediaItem
 import com.fireflicker.fireplex2.data.PlexPin
 import com.fireflicker.fireplex2.data.PlexRepository
 import com.fireflicker.fireplex2.data.PlexSubtitleTrack
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -132,6 +134,7 @@ fun FirePlexApp(repo: PlexRepository) {
     var hiddenKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var mediaItems by remember { mutableStateOf<List<PlexMediaItem>>(emptyList()) }
     var categoryMemoryCache by remember { mutableStateOf<Map<String, List<PlexMediaItem>>>(emptyMap()) }
+    var categoryLoadJob by remember { mutableStateOf<Job?>(null) }
     var preloadingLibraryKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     var libraryLoadingMore by remember { mutableStateOf(false) }
     var recentlyMovies by remember { mutableStateOf<List<PlexMediaItem>>(emptyList()) }
@@ -144,6 +147,8 @@ fun FirePlexApp(repo: PlexRepository) {
     var globalSearchItems by remember { mutableStateOf<List<PlexMediaItem>>(emptyList()) }
     var artworkUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var backdropUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var homeArtworkUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var homeBackdropUrls by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var cachedAt by remember { mutableStateOf(0L) }
 
     var showSettings by remember { mutableStateOf(false) }
@@ -210,12 +215,16 @@ fun FirePlexApp(repo: PlexRepository) {
     }
 
     fun goHome() {
+        categoryLoadJob?.cancel()
+        categoryLoadJob = null
         showSettings = false
         showUpdateScreen = false
         showFavoritesScreen = false
         showGlobalSearch = false
         selectedMode = null
         selectedLibrary = null
+        mediaItems = emptyList()
+        categoryMemoryCache = emptyMap()
         selectedShow = null
         selectedSeason = null
         seasonItems = emptyList()
@@ -313,6 +322,8 @@ fun FirePlexApp(repo: PlexRepository) {
     }
 
     suspend fun loadCachedContent(): Boolean {
+        // Remove full-library caches created by older builds. Home indexes remain cached.
+        repo.clearLibraryCaches()
         val cachedLibraries = repo.cachedLibraries()
         val cachedMovies = repo.cachedRecentlyAddedMovies()
         val cachedShows = repo.cachedRecentlyAddedShows()
@@ -329,6 +340,8 @@ fun FirePlexApp(repo: PlexRepository) {
         hiddenKeys = repo.hiddenLibraryKeys()
 
         val artwork = loadArtwork((recentlyMovies + recentlyShows + continueWatching).take(120))
+        homeArtworkUrls = artwork.first
+        homeBackdropUrls = artwork.second
         artworkUrls = artwork.first
         backdropUrls = artwork.second
 
@@ -350,10 +363,6 @@ fun FirePlexApp(repo: PlexRepository) {
         collected += mediaItems
         collected += seasonItems
         collected += episodeItems
-        libraries.forEach { library ->
-            collected += runCatching { repo.cachedLibraryItems(library.key) }.getOrDefault(emptyList())
-        }
-
         val favs = collected
             .filter { keys.contains(mediaItemStableId(it)) }
             .distinctBy { mediaItemStableId(it) }
@@ -367,49 +376,15 @@ fun FirePlexApp(repo: PlexRepository) {
     }
 
     fun preloadLibraryInBackground(library: PlexLibrary) {
+        // Categories now load only when selected. Focus-based preloading previously retained
+        // several complete libraries and could exhaust memory on lower-powered TV devices.
         if (library.key.isBlank()) return
-        if (preloadingLibraryKeys.contains(library.key)) return
-        if (preloadingLibraryKeys.isNotEmpty()) return
-        if (selectedItem != null) return
-
-        scope.launch {
-            preloadingLibraryKeys = preloadingLibraryKeys + library.key
-            try {
-                val memoryItems = categoryMemoryCache[library.key].orEmpty()
-                val cachedItems = repo.cachedLibraryItems(library.key)
-                if (memoryItems.isNotEmpty() || cachedItems.isNotEmpty()) {
-                    val items = if (memoryItems.isNotEmpty()) memoryItems else cachedItems
-                    categoryMemoryCache = categoryMemoryCache + (library.key to items)
-                    val firstArtwork = loadArtwork(items.take(80))
-                    artworkUrls = artworkUrls + firstArtwork.first
-                    backdropUrls = backdropUrls + firstArtwork.second
-                    return@launch
-                }
-
-                val freshItems = repo.libraryItems(library)
-                if (freshItems.isNotEmpty()) {
-                    categoryMemoryCache = categoryMemoryCache + (library.key to freshItems)
-                    repo.saveLibraryCache(library.key, freshItems)
-
-                    val firstArtwork = loadArtwork(freshItems.take(80))
-                    artworkUrls = artworkUrls + firstArtwork.first
-                    backdropUrls = backdropUrls + firstArtwork.second
-
-                    // Continue generating the rest of the artwork URLs without blocking category opening.
-                    val remainingArtwork = loadArtwork(freshItems.drop(80))
-                    artworkUrls = artworkUrls + remainingArtwork.first
-                    backdropUrls = backdropUrls + remainingArtwork.second
-                }
-            } catch (_: Throwable) {
-                // Background preload must never break browsing.
-            } finally {
-                preloadingLibraryKeys = preloadingLibraryKeys - library.key
-            }
-        }
     }
 
 
     fun updateContent() {
+        categoryLoadJob?.cancel()
+        categoryLoadJob = null
         scope.launch {
             loading = true
             showUpdateScreen = true
@@ -450,8 +425,10 @@ fun FirePlexApp(repo: PlexRepository) {
 
                 updateArtworkStatus = "Caching visible artwork..."
                 val artwork = loadArtwork((movies + shows + watching).take(120))
-                artworkUrls = artworkUrls + artwork.first
-                backdropUrls = backdropUrls + artwork.second
+                homeArtworkUrls = artwork.first
+                homeBackdropUrls = artwork.second
+                artworkUrls = artwork.first
+                backdropUrls = artwork.second
                 updateArtworkStatus = "Visible artwork cached"
 
                 repo.saveHomeCache(freshLibraries, movies, shows)
@@ -483,12 +460,16 @@ fun FirePlexApp(repo: PlexRepository) {
             globalSearchItems = emptyList()
             artworkUrls = emptyMap()
             backdropUrls = emptyMap()
+            homeArtworkUrls = emptyMap()
+            homeBackdropUrls = emptyMap()
             cachedAt = 0L
             status = "Content cache cleared. Run Update Contents to reload."
         }
     }
 
     fun signOutFirePlex() {
+        categoryLoadJob?.cancel()
+        categoryLoadJob = null
         scope.launch {
             repo.clearToken()
             linked = false
@@ -513,6 +494,8 @@ fun FirePlexApp(repo: PlexRepository) {
             libraryLoadingMore = false
             artworkUrls = emptyMap()
             backdropUrls = emptyMap()
+            homeArtworkUrls = emptyMap()
+            homeBackdropUrls = emptyMap()
             showSettings = false
             showUpdateScreen = false
             selectedMode = null
@@ -543,8 +526,12 @@ fun FirePlexApp(repo: PlexRepository) {
                 recentlyMovies = movies
                 recentlyShows = shows
                 continueWatching = watching
-                artworkUrls = artworkUrls + artwork.first
-                backdropUrls = backdropUrls + artwork.second
+                homeArtworkUrls = artwork.first
+                homeBackdropUrls = artwork.second
+                if (selectedMode == null && selectedLibrary == null) {
+                    artworkUrls = artwork.first
+                    backdropUrls = artwork.second
+                }
                 repo.saveHomeCache(freshLibraries, movies, shows)
                 cachedAt = repo.cachedUpdatedAt()
                 refreshFavoritesFromCache()
@@ -689,35 +676,7 @@ fun FirePlexApp(repo: PlexRepository) {
             collected += episodeItems
             publishSearchItems("Loading cached Movies + TV Series...")
 
-            val enabledLibraries = libraries
-                .filterNot { hiddenKeys.contains(it.key) }
-                .filter { library ->
-                    library.type.equals("movie", ignoreCase = true) ||
-                        library.type.equals("show", ignoreCase = true) ||
-                        library.type.equals("tv", ignoreCase = true)
-                }
-
-            enabledLibraries.forEachIndexed { index, library ->
-                val cached = runCatching { repo.cachedLibraryItems(library.key) }.getOrDefault(emptyList())
-                if (cached.isNotEmpty()) {
-                    collected += cached
-                    publishSearchItems("Loaded cached ${library.title} for global search...")
-                } else {
-                    status = "Adding ${library.title} to global search (${index + 1}/${enabledLibraries.size})..."
-                    val fresh = runCatching { repo.libraryItems(library) }.getOrDefault(emptyList())
-                    if (fresh.isNotEmpty()) {
-                        collected += fresh
-                        categoryMemoryCache = categoryMemoryCache + (library.key to fresh)
-                        repo.saveLibraryCache(library.key, fresh)
-                        val artwork = loadArtwork(fresh.take(80))
-                        artworkUrls = artworkUrls + artwork.first
-                        backdropUrls = backdropUrls + artwork.second
-                        publishSearchItems("Added ${library.title} to global search...")
-                    }
-                }
-            }
-
-            publishSearchItems("Search Movies and TV Series.")
+            publishSearchItems("Search loaded and recent Movies + TV Series.")
             loading = false
         }
     }
@@ -916,8 +875,8 @@ fun FirePlexApp(repo: PlexRepository) {
                 seasonItems = repo.tvSeasons(show)
 
                 val artwork = loadArtwork(seasonItems + listOf(show))
-                artworkUrls = artworkUrls + artwork.first
-                backdropUrls = backdropUrls + artwork.second
+                artworkUrls = homeArtworkUrls + artwork.first
+                backdropUrls = homeBackdropUrls + artwork.second
 
                 status = if (seasonItems.isEmpty()) {
                     "No seasons found for ${show.title}."
@@ -943,8 +902,8 @@ fun FirePlexApp(repo: PlexRepository) {
                 episodeItems = repo.seasonEpisodes(season)
 
                 val artwork = loadArtwork(episodeItems + listOf(season))
-                artworkUrls = artworkUrls + artwork.first
-                backdropUrls = backdropUrls + artwork.second
+                artworkUrls = homeArtworkUrls + artwork.first
+                backdropUrls = homeBackdropUrls + artwork.second
 
                 status = if (episodeItems.isEmpty()) {
                     "No episodes found in ${season.title}."
@@ -1044,7 +1003,8 @@ fun FirePlexApp(repo: PlexRepository) {
     }
 
     fun loadLibraryItems(library: PlexLibrary) {
-        scope.launch {
+        categoryLoadJob?.cancel()
+        categoryLoadJob = scope.launch {
             loading = true
             libraryLoadingMore = false
             status = "Opening ${library.title}..."
@@ -1062,69 +1022,34 @@ fun FirePlexApp(repo: PlexRepository) {
                 showSettings = false
                 showUpdateScreen = false
 
-                val memoryItems = categoryMemoryCache[library.key].orEmpty()
-                val cachedItems = if (memoryItems.isEmpty()) repo.cachedLibraryItems(library.key) else emptyList()
-                val instantItems = if (memoryItems.isNotEmpty()) memoryItems else cachedItems
+                // Release the previous category before requesting the next one. Only one full
+                // category is retained in memory and category lists are no longer saved to DataStore.
+                mediaItems = emptyList()
+                categoryMemoryCache = emptyMap()
+                seasonItems = emptyList()
+                episodeItems = emptyList()
+                artworkUrls = homeArtworkUrls
+                backdropUrls = homeBackdropUrls
+                repo.clearLibraryCaches()
 
-                if (instantItems.isNotEmpty()) {
-                    mediaItems = instantItems
-                    categoryMemoryCache = categoryMemoryCache + (library.key to instantItems)
-                    val firstArtwork = loadArtwork(instantItems.take(80))
-                    artworkUrls = artworkUrls + firstArtwork.first
-                    backdropUrls = backdropUrls + firstArtwork.second
-                    status = "Showing saved ${library.title}. Loading newer content in background..."
-                    loading = false
-                    libraryLoadingMore = true
+                status = "Refreshing ${library.title} from Plex..."
+                val freshItems = repo.libraryItems(library)
+                mediaItems = freshItems
+                categoryMemoryCache = mapOf(library.key to freshItems)
 
-                    scope.launch {
-                        try {
-                            val freshItems = repo.libraryItems(library)
-                            if (freshItems.isNotEmpty()) {
-                                mediaItems = freshItems
-                                categoryMemoryCache = categoryMemoryCache + (library.key to freshItems)
-                                repo.saveLibraryCache(library.key, freshItems)
+                val categoryArtwork = loadArtwork(freshItems)
+                artworkUrls = homeArtworkUrls + categoryArtwork.first
+                backdropUrls = homeBackdropUrls + categoryArtwork.second
+                refreshFavoritesFromCache()
 
-                                val visibleArtwork = loadArtwork(freshItems.take(120))
-                                artworkUrls = artworkUrls + visibleArtwork.first
-                                backdropUrls = backdropUrls + visibleArtwork.second
-                                status = "Updated ${library.title}."
-
-                                val restArtwork = loadArtwork(freshItems.drop(120))
-                                artworkUrls = artworkUrls + restArtwork.first
-                                backdropUrls = backdropUrls + restArtwork.second
-                            }
-                            refreshFavoritesFromCache()
-                        } catch (_: Throwable) {
-                            status = "Showing saved ${library.title}."
-                        } finally {
-                            libraryLoadingMore = false
-                        }
-                    }
+                status = if (freshItems.isEmpty()) {
+                    "No videos found in ${library.title}."
                 } else {
-                    status = "Loading first items from ${library.title}..."
-                    val freshItems = repo.libraryItems(library)
-                    mediaItems = freshItems
-                    categoryMemoryCache = categoryMemoryCache + (library.key to freshItems)
-                    repo.saveLibraryCache(library.key, freshItems)
-
-                    val firstArtwork = loadArtwork(freshItems.take(120))
-                    artworkUrls = artworkUrls + firstArtwork.first
-                    backdropUrls = backdropUrls + firstArtwork.second
-                    refreshFavoritesFromCache()
-
-                    status = if (freshItems.isEmpty()) {
-                        "No videos found in ${library.title}."
-                    } else {
-                        "Choose something to watch."
-                    }
-                    loading = false
-
-                    scope.launch {
-                        val restArtwork = loadArtwork(freshItems.drop(120))
-                        artworkUrls = artworkUrls + restArtwork.first
-                        backdropUrls = backdropUrls + restArtwork.second
-                    }
+                    "Choose something to watch."
                 }
+                loading = false
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 status = e.message ?: "Could not load category content."
                 loading = false
@@ -1174,6 +1099,8 @@ fun FirePlexApp(repo: PlexRepository) {
     }
 
     fun startLink() {
+        categoryLoadJob?.cancel()
+        categoryLoadJob = null
         scope.launch {
             loading = true
             status = "Getting Plex link code..."
@@ -2667,14 +2594,25 @@ fun VodSeriesMenuItem(text: String, selected: Boolean, onClick: () -> Unit) {
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .tvRemoteClick(onClick = onClick),
-        color = if (active) Color(0x3329D3FF) else Color.Transparent,
+        color = when {
+            focused -> Color(0xFF24323D)
+            selected -> Color(0xFF17232C)
+            else -> Color.Transparent
+        },
         border = if (focused) BorderStroke(2.dp, Color(0xFF00E676)) else null,
-        shape = RoundedCornerShape(4.dp)
+        shape = RoundedCornerShape(6.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .height(30.dp)
+                    .background(if (active) Color(0xFF00E676) else Color.Transparent)
+            )
             Text(
                 text = text,
-                color = if (active) Color(0xFF00E676) else Color.White,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                color = if (focused) Color.White else if (selected) Color(0xFF00E676) else Color(0xFFE4E9EE),
                 fontSize = if (active) 16.sp else 15.sp,
                 fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 2,
