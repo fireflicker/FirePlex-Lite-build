@@ -7,6 +7,7 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application
+        android:name=".FirePlexApplication"
         android:theme="@style/AppTheme"
         android:label="FirePlex3.0"
         android:icon="@mipmap/ic_launcher"
