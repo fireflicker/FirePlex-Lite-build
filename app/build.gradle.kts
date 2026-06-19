@@ -14,8 +14,8 @@ android {
         applicationId = "com.fireflicker.fireplex2"
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "1.3-paged-room-cache"
+        versionCode = 8
+        versionName = "1.4-server-efficiency"
     }
 
     compileOptions {
