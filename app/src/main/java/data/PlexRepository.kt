@@ -449,15 +449,28 @@ class PlexRepository(private val context: Context) {
     }
 
     suspend fun libraryItems(library: PlexLibrary): List<PlexMediaItem> = withContext(Dispatchers.IO) {
+        libraryItemsInternal(library, start = null, size = null)
+    }
+
+    suspend fun libraryItemsPage(library: PlexLibrary, start: Int = 0, size: Int = 60): List<PlexMediaItem> = withContext(Dispatchers.IO) {
+        libraryItemsInternal(library, start = start.coerceAtLeast(0), size = size.coerceIn(1, 250))
+    }
+
+    private suspend fun libraryItemsInternal(library: PlexLibrary, start: Int?, size: Int?): List<PlexMediaItem> {
         val base = serverBase()
         val token = savedToken() ?: error("Not linked")
-        val url = if (library.type.equals("show", ignoreCase = true) || library.type.equals("tv", ignoreCase = true)) {
+        val baseUrl = if (library.type.equals("show", ignoreCase = true) || library.type.equals("tv", ignoreCase = true)) {
             "${base.trimEnd('/')}/library/sections/${library.key}/all?type=2&sort=titleSort"
         } else {
-            "${base.trimEnd('/')}/library/sections/${library.key}/all"
+            "${base.trimEnd('/')}/library/sections/${library.key}/all?sort=titleSort"
+        }
+        val pagedUrl = if (start != null && size != null) {
+            "$baseUrl&X-Plex-Container-Start=$start&X-Plex-Container-Size=$size"
+        } else {
+            baseUrl
         }
 
-        PlexXmlParser.parseMediaItems(serverRequest(url, token))
+        return PlexXmlParser.parseMediaItems(serverRequest(pagedUrl, token))
     }
 
     suspend fun mediaDetails(item: PlexMediaItem): PlexMediaItem = withContext(Dispatchers.IO) {
@@ -522,14 +535,40 @@ class PlexRepository(private val context: Context) {
         val base = serverBase()
         val token = savedToken() ?: error("Not linked")
 
-        shows.flatMap { library ->
+        val recentItems = shows.flatMap { library ->
             val recentUrl = "${base.trimEnd('/')}/library/sections/${library.key}/recentlyAdded"
             runCatching { PlexXmlParser.parseMediaItems(serverRequest(recentUrl, token)) }.getOrDefault(emptyList())
-        }
-            .filter { it.type.equals("episode", ignoreCase = true) || it.type.equals("show", ignoreCase = true) || it.type.equals("video", ignoreCase = true) }
-            .sortedByNewest()
-            .distinctBy { item -> item.ratingKey.ifBlank { item.key.ifBlank { item.title.lowercase() } } }
+        }.sortedByNewest()
+
+        // Home screen should show the TV series when a new episode is added, not a random episode poster.
+        // We group recent episodes by grandparent/show ratingKey, then fetch that show metadata.
+        val recentShowKeys = recentItems
+            .mapNotNull { item ->
+                when {
+                    item.type.equals("show", ignoreCase = true) -> item.ratingKey.ifBlank { item.key }.takeIf { it.isNotBlank() }?.let { it to item.addedAt }
+                    item.grandparentRatingKey.isNotBlank() -> item.grandparentRatingKey to item.addedAt
+                    item.parentRatingKey.isNotBlank() && item.type.equals("episode", ignoreCase = true) -> item.parentRatingKey to item.addedAt
+                    else -> null
+                }
+            }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { entry -> entry.value.maxOrNull() ?: 0L }
+            .entries
+            .sortedByDescending { it.value }
             .take(30)
+
+        val showCards = recentShowKeys.mapNotNull { (showKey, newestAddedAt) ->
+            runCatching {
+                val body = serverRequest("${base.trimEnd('/')}/library/metadata/$showKey", token)
+                PlexXmlParser.parseMediaItems(body).firstOrNull()?.copy(
+                    addedAt = newestAddedAt,
+                    summary = "New episode available. Open the series to choose the season and episode."
+                )
+            }.getOrNull()
+        }
+
+        if (showCards.isNotEmpty()) showCards.distinctBy { it.ratingKey }.take(30)
+        else recentItems.filter { it.type.equals("show", ignoreCase = true) }.distinctBy { it.ratingKey }.take(30)
     }
 
     suspend fun continueWatching(): List<PlexMediaItem> = withContext(Dispatchers.IO) {
@@ -737,7 +776,10 @@ class PlexRepository(private val context: Context) {
                 item.durationMs.toString(),
                 item.viewOffsetMs.toString(),
                 item.addedAt.toString(),
-                item.partKey
+                item.partKey,
+                item.rating,
+                item.audienceRating,
+                item.tagline
             ).joinToString("\t") { b64(it) }
         }
     }
@@ -770,7 +812,10 @@ class PlexRepository(private val context: Context) {
                         viewOffsetMs = unb64(parts[10 + offset]).toLongOrNull() ?: 0L,
                         addedAt = unb64(parts[11 + offset]).toLongOrNull() ?: 0L,
                         partKey = unb64(parts[12 + offset]),
-                        subtitles = emptyList()
+                        subtitles = emptyList(),
+                        rating = parts.getOrNull(13 + offset)?.let { unb64(it) }.orEmpty(),
+                        audienceRating = parts.getOrNull(14 + offset)?.let { unb64(it) }.orEmpty(),
+                        tagline = parts.getOrNull(15 + offset)?.let { unb64(it) }.orEmpty()
                     )
                 }
             }
