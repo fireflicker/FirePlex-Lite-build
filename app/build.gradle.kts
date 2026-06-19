@@ -14,8 +14,8 @@ android {
         applicationId = "com.fireflicker.fireplex2"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "1.5-direct-first-tv-home"
+        versionCode = 10
+        versionName = "1.6-player-controls-tv-feed"
     }
 
     compileOptions {
