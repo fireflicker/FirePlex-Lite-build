@@ -19,9 +19,9 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".StartupActivity"
             android:screenOrientation="landscape"
-            android:resizeableActivity="true"
+            android:resizeableActivity="false"
             android:exported="true">
 
             <intent-filter>
@@ -31,6 +31,12 @@
             </intent-filter>
 
         </activity>
+
+        <activity
+            android:name=".MainActivity"
+            android:screenOrientation="landscape"
+            android:resizeableActivity="true"
+            android:exported="false" />
     </application>
 
 </manifest>
