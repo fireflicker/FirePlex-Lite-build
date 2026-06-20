@@ -11,7 +11,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
@@ -125,7 +127,7 @@ class OpenSubtitlesRepository(context: Context) {
             (subtitleBytes[1].toInt() and 0xFF) == 0x8B
         ) {
             GZIPInputStream(ByteArrayInputStream(subtitleBytes)).use { gzip ->
-                gzip.readBytes(MAX_SUBTITLE_BYTES)
+                gzip.readLimitedBytes(MAX_SUBTITLE_BYTES)
             }
         } else {
             subtitleBytes
@@ -170,6 +172,24 @@ class OpenSubtitlesRepository(context: Context) {
             .addHeader("User-Agent", "FirePlex v4")
             .addHeader("Accept", "application/json")
             .addHeader("Content-Type", "application/json")
+    }
+
+    private fun InputStream.readLimitedBytes(maxBytes: Int): ByteArray {
+        val output = ByteArrayOutputStream(minOf(maxBytes, 8 * 1024))
+        val buffer = ByteArray(8 * 1024)
+        var total = 0
+
+        while (true) {
+            val count = read(buffer)
+            if (count < 0) break
+            total += count
+            if (total > maxBytes) {
+                throw IllegalStateException("Subtitle file was too large after decompression.")
+            }
+            output.write(buffer, 0, count)
+        }
+
+        return output.toByteArray()
     }
 
     private companion object {
