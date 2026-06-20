@@ -14,8 +14,8 @@ android {
         applicationId = "com.fireflicker.fireplex2"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.6-player-controls-tv-feed"
+        versionCode = 11
+        versionName = "1.7-navigation-local-history"
     }
 
     compileOptions {
