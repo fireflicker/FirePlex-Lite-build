@@ -44,6 +44,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -148,7 +149,7 @@ fun ExoVideoPlayer(
     var playerLoading by remember { mutableStateOf(true) }
     var playerLoadingText by remember { mutableStateOf("Finding stream on Plex...") }
     var resumeAfterBackground by remember { mutableStateOf(false) }
-    val initialPositionMs = remember(playUrl, subtitleUrl) { startPositionMs.coerceAtLeast(0L) }
+    val initialPositionMs = remember(playUrl) { startPositionMs.coerceAtLeast(0L) }
     val playerRootFocus = remember { FocusRequester() }
     val seekFocus = remember { FocusRequester() }
     val rewindFocus = remember { FocusRequester() }
@@ -176,7 +177,7 @@ fun ExoVideoPlayer(
         }
     }
 
-    val player = remember(playUrl, subtitleUrl, settings.preBufferSeconds, trackSelector) {
+    val player = remember(playUrl, settings.preBufferSeconds, trackSelector) {
         val targetBufferMs = settings.preBufferSeconds.coerceIn(10, 60) * 1000
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(targetBufferMs, targetBufferMs * 2, 2500, 5000)
@@ -195,7 +196,7 @@ fun ExoVideoPlayer(
             .setUserAgent("FirePlex/AndroidTV Media3")
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
-            .setDataSourceFactory(httpDataSourceFactory)
+            .setDataSourceFactory(DefaultDataSource.Factory(context, httpDataSourceFactory))
 
         ExoPlayer.Builder(context)
             .setRenderersFactory(renderersFactory)
@@ -272,10 +273,16 @@ fun ExoVideoPlayer(
     }
 
     LaunchedEffect(player, playUrl, subtitleUrl) {
+        val resumePosition = if (player.currentPosition > 0L) {
+            player.currentPosition
+        } else {
+            initialPositionMs
+        }
+        val wasPlaying = player.isPlaying || player.playWhenReady
         player.setMediaItem(buildMediaItem())
         player.prepare()
-        if (initialPositionMs > 0L) player.seekTo(initialPositionMs)
-        player.playWhenReady = true
+        if (resumePosition > 0L) player.seekTo(resumePosition)
+        player.playWhenReady = wasPlaying || resumePosition == initialPositionMs
     }
 
     DisposableEffect(player) {
