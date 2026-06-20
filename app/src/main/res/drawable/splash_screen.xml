@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/fireplex_background" />
+        </shape>
+    </item>
+    <item>
+        <bitmap
+            android:src="@drawable/fireplex_bg"
+            android:gravity="center"
+            android:alpha="90" />
+    </item>
+    <item
+        android:gravity="center"
+        android:left="40dp"
+        android:right="40dp"
+        android:top="40dp"
+        android:bottom="40dp">
+        <bitmap
+            android:src="@drawable/app_logo"
+            android:gravity="center"
+            android:tileMode="disabled" />
+    </item>
+</layer-list>
