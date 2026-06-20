@@ -1,5 +1,7 @@
 package com.fireflicker.fireplex2.data
 
+import android.content.Context
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -8,8 +10,11 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
+import java.io.File
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
+import java.util.zip.GZIPInputStream
 
 data class OpenSubtitleResult(
     val fileId: Int,
@@ -19,10 +24,13 @@ data class OpenSubtitleResult(
     val downloads: Int
 )
 
-class OpenSubtitlesRepository {
+class OpenSubtitlesRepository(context: Context) {
+    private val appContext = context.applicationContext
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
         .build()
 
     private var token: String? = null
@@ -91,8 +99,50 @@ class OpenSubtitlesRepository {
             if (!response.isSuccessful) throw IllegalStateException("OpenSubtitles download failed: ${response.code}")
             response.body?.string().orEmpty()
         }
-        JSONObject(body).optString("link").takeIf { it.isNotBlank() }
+        val temporaryLink = JSONObject(body).optString("link").takeIf { it.isNotBlank() }
             ?: throw IllegalStateException("OpenSubtitles returned no subtitle link.")
+
+        val subtitleBytes = client.newCall(
+            Request.Builder()
+                .url(temporaryLink)
+                .header("User-Agent", "FirePlex v4")
+                .get()
+                .build()
+        ).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IllegalStateException("Subtitle file download failed: ${response.code}")
+            }
+            response.body?.bytes() ?: throw IllegalStateException("Subtitle file was empty.")
+        }
+
+        if (subtitleBytes.isEmpty() || subtitleBytes.size > MAX_SUBTITLE_BYTES) {
+            throw IllegalStateException("Subtitle file was empty or too large.")
+        }
+
+        val decodedBytes = if (
+            subtitleBytes.size >= 2 &&
+            (subtitleBytes[0].toInt() and 0xFF) == 0x1F &&
+            (subtitleBytes[1].toInt() and 0xFF) == 0x8B
+        ) {
+            GZIPInputStream(ByteArrayInputStream(subtitleBytes)).use { gzip ->
+                gzip.readBytes(MAX_SUBTITLE_BYTES)
+            }
+        } else {
+            subtitleBytes
+        }
+
+        if (decodedBytes.isEmpty() || decodedBytes.size > MAX_SUBTITLE_BYTES) {
+            throw IllegalStateException("Subtitle file could not be decoded.")
+        }
+
+        val subtitleDirectory = File(appContext.cacheDir, "subtitles").apply { mkdirs() }
+        subtitleDirectory.listFiles()
+            ?.filter { it.isFile && System.currentTimeMillis() - it.lastModified() > SUBTITLE_CACHE_MAX_AGE_MS }
+            ?.forEach { runCatching { it.delete() } }
+
+        val subtitleFile = File(subtitleDirectory, "opensubtitles_$fileId.srt")
+        subtitleFile.writeBytes(decodedBytes)
+        Uri.fromFile(subtitleFile).toString()
     }
 
     private fun login(): String {
@@ -120,5 +170,10 @@ class OpenSubtitlesRepository {
             .addHeader("User-Agent", "FirePlex v4")
             .addHeader("Accept", "application/json")
             .addHeader("Content-Type", "application/json")
+    }
+
+    private companion object {
+        const val MAX_SUBTITLE_BYTES = 10 * 1024 * 1024
+        const val SUBTITLE_CACHE_MAX_AGE_MS = 7L * 24L * 60L * 60L * 1000L
     }
 }
