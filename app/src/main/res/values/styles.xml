@@ -2,12 +2,6 @@
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowNoTitle">true</item>
-        <item name="android:windowActionBar">false</item>
-        <item name="android:windowBackground">@drawable/splash_screen</item>
-        <item name="android:colorAccent">@color/fireplex_focus_green</item>
-        <item name="android:navigationBarColor">@color/fireplex_background</item>
-        <item name="android:statusBarColor">@color/fireplex_background</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorAccent">#00A8FF</item>
     </style>
 </resources>
