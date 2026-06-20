@@ -111,10 +111,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun FirePlexApp(repo: PlexRepository) {
-    val activity = LocalContext.current as? Activity
+    val context = LocalContext.current
+    val activity = context as? Activity
     val scope = rememberCoroutineScope()
     val appAuth = remember { AppAuthRepository() }
-    val openSubtitles = remember { OpenSubtitlesRepository() }
+    val openSubtitles = remember(context) { OpenSubtitlesRepository(context) }
 
     var status by remember { mutableStateOf("Checking saved Plex login...") }
     var needsAppLogin by remember { mutableStateOf(false) }
