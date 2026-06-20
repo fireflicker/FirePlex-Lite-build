@@ -11,24 +11,6 @@ abstract class CachedMediaDao {
     @Query("SELECT * FROM cached_media WHERE categoryKey = :categoryKey ORDER BY position LIMIT :limit OFFSET :offset")
     abstract suspend fun page(categoryKey: String, offset: Int, limit: Int): List<CachedMediaEntity>
 
-    @Query("SELECT * FROM cached_media WHERE categoryKey = :categoryKey ORDER BY position LIMIT :limit")
-    abstract suspend fun firstItems(categoryKey: String, limit: Int): List<CachedMediaEntity>
-
-    @Query("""
-        SELECT * FROM cached_media
-        WHERE categoryKey = :categoryKey
-        AND (
-            title LIKE :query OR
-            year LIKE :query OR
-            type LIKE :query OR
-            summary LIKE :query OR
-            contentRating LIKE :query
-        )
-        ORDER BY title COLLATE NOCASE
-        LIMIT :limit
-    """)
-    abstract suspend fun search(categoryKey: String, query: String, limit: Int): List<CachedMediaEntity>
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insert(items: List<CachedMediaEntity>)
 
@@ -43,8 +25,8 @@ abstract class CachedMediaDao {
 
     @Transaction
     open suspend fun replaceFirstPage(categoryKey: String, items: List<CachedMediaEntity>) {
-        // Keep other categories cached so Movies / TV / category switching stays fast.
         deleteCategory(categoryKey)
+        deleteOtherCategories(categoryKey)
         if (items.isNotEmpty()) insert(items)
     }
 }
