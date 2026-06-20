@@ -1,12 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#05090D</color>
-
-    <color name="fireplex_background">#05090D</color>
-    <color name="fireplex_card">#16202A</color>
-    <color name="fireplex_focus_green">#00FF66</color>
-    <color name="fireplex_focus_orange">#FFB000</color>
-    <color name="fireplex_input_red">#FF2D2D</color>
-    <color name="fireplex_text_white">#FFFFFF</color>
-    <color name="fireplex_text_muted">#B7C7D8</color>
 </resources>
