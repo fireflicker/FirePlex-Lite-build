@@ -14,8 +14,8 @@ android {
         applicationId = "com.fireflicker.fireplex2"
         minSdk = 26
         targetSdk = 34
-        versionCode = 11
-        versionName = "1.7-navigation-local-history"
+        versionCode = 12
+        versionName = "1.7.1-subtitle-stability"
     }
 
     compileOptions {
