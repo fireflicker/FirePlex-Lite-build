@@ -9,7 +9,7 @@
     <application
         android:name=".FirePlexApplication"
         android:theme="@style/AppTheme"
-        android:label="FirePlex3.0"
+        android:label="FirePlex 1.7.7"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:banner="@drawable/app_banner"
@@ -17,6 +17,16 @@
         android:supportsRtl="true"
         android:hardwareAccelerated="true"
         android:usesCleartextTraffic="true">
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <activity
             android:name=".MainActivity"
