@@ -132,6 +132,7 @@ fun ExoVideoPlayer(
     var playerLoading by remember { mutableStateOf(true) }
     var playerLoadingText by remember { mutableStateOf("Finding stream on Plex...") }
     var resumeAfterBackground by remember { mutableStateOf(false) }
+    var controlActivityTick by remember { mutableStateOf(0) }
     val initialPositionMs = remember(playUrl, subtitleUrl) { startPositionMs.coerceAtLeast(0L) }
     val playerRootFocus = remember { FocusRequester() }
     val rewindFocus = remember { FocusRequester() }
@@ -236,11 +237,17 @@ fun ExoVideoPlayer(
         durationMs = player.duration.takeIf { it > 0L } ?: 0L
     }
 
+    fun markControlsActive() {
+        controlActivityTick++
+    }
+
     LaunchedEffect(player) {
         while (true) {
-            delay(5000)
+            delay(10_000)
             updatePlayerState()
-            onPlayback(if (player.isPlaying) "playing" else "paused", positionMs, durationMs)
+            if (player.isPlaying) {
+                onPlayback("playing", positionMs, durationMs)
+            }
         }
     }
 
@@ -316,7 +323,7 @@ fun ExoVideoPlayer(
         }
     }
 
-    LaunchedEffect(controlsVisible, subtitlesOpen) {
+    LaunchedEffect(controlsVisible, subtitlesOpen, controlActivityTick) {
         if (controlsVisible && !subtitlesOpen) {
             delay(7000)
             if (player.isPlaying && !subtitlesOpen) {
@@ -344,16 +351,20 @@ fun ExoVideoPlayer(
                     Key.DirectionCenter, Key.Enter -> {
                         if (!controlsVisible) {
                             controlsVisible = true
+                            markControlsActive()
                             true
                         } else {
+                            markControlsActive()
                             false
                         }
                     }
                     Key.DirectionLeft, Key.DirectionRight, Key.DirectionUp, Key.DirectionDown -> {
                         if (!controlsVisible) {
                             controlsVisible = true
+                            markControlsActive()
                             true
                         } else {
+                            markControlsActive()
                             false
                         }
                     }
@@ -414,7 +425,7 @@ fun ExoVideoPlayer(
                 if (durationMs > 0L) {
                     Slider(
                         value = positionMs.coerceIn(0L, durationMs).toFloat(),
-                        onValueChange = { player.seekTo(it.toLong()); updatePlayerState() },
+                        onValueChange = { markControlsActive(); player.seekTo(it.toLong()); updatePlayerState() },
                         valueRange = 0f..durationMs.toFloat(),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -437,7 +448,7 @@ fun ExoVideoPlayer(
                             .focusRequester(rewindFocus)
                             .focusProperties { left = startFocus; right = playPauseFocus },
                         Color(0xAA203040)
-                    ) { player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L)); updatePlayerState() }
+                    ) { markControlsActive(); player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L)); updatePlayerState() }
                     FocusActionButton(
                         if (player.isPlaying) "PAUSE" else "PLAY",
                         Modifier
@@ -446,8 +457,10 @@ fun ExoVideoPlayer(
                             .focusProperties { left = rewindFocus; right = forwardFocus },
                         Color(0xFF00E676)
                     ) {
+                        markControlsActive()
                         if (player.isPlaying) player.pause() else player.play()
                         updatePlayerState()
+                        onPlayback(if (player.isPlaying) "playing" else "paused", positionMs, durationMs)
                     }
                     FocusActionButton(
                         "+30",
@@ -456,7 +469,7 @@ fun ExoVideoPlayer(
                             .focusRequester(forwardFocus)
                             .focusProperties { left = playPauseFocus; right = speedFocus },
                         Color(0xAA203040)
-                    ) { player.seekTo(player.currentPosition + 30_000L); updatePlayerState() }
+                    ) { markControlsActive(); player.seekTo(player.currentPosition + 30_000L); updatePlayerState() }
                     FocusActionButton(
                         "SPEED ${speeds[speedIndex]}x",
                         Modifier
@@ -465,6 +478,7 @@ fun ExoVideoPlayer(
                             .focusProperties { left = forwardFocus; right = subtitlesFocus },
                         Color(0xAA203040)
                     ) {
+                        markControlsActive()
                         speedIndex = (speedIndex + 1) % speeds.size
                         player.setPlaybackSpeed(speeds[speedIndex])
                     }
@@ -475,7 +489,7 @@ fun ExoVideoPlayer(
                             .focusRequester(subtitlesFocus)
                             .focusProperties { left = speedFocus; right = startFocus },
                         Color(0xAA203040)
-                    ) { subtitlesOpen = !subtitlesOpen }
+                    ) { markControlsActive(); subtitlesOpen = !subtitlesOpen }
                     FocusActionButton(
                         "RESTART",
                         Modifier
@@ -483,7 +497,7 @@ fun ExoVideoPlayer(
                             .focusRequester(startFocus)
                             .focusProperties { left = subtitlesFocus; right = rewindFocus },
                         Color(0xAA203040)
-                    ) { player.seekTo(0L); updatePlayerState() }
+                    ) { markControlsActive(); player.seekTo(0L); updatePlayerState(); onPlayback("playing", 0L, durationMs) }
                 }
 
                 Spacer(Modifier.height(8.dp))

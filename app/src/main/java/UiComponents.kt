@@ -2,7 +2,6 @@
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,29 +24,30 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.fireflicker.fireplex2.data.PlexLibrary
 import com.fireflicker.fireplex2.data.PlexMediaItem
+
 @Composable
 fun LobbyCircleTile(label: String, icon: String, enabled: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     val borderColor = when {
-        focused -> Color(0xFF00E676)
+        focused -> FirePlexColors.Accent
         enabled -> Color(0x99FFFFFF)
         else -> Color(0x44FFFFFF)
     }
-    val contentColor = if (enabled) Color.White else Color(0xFF6D7784)
+    val contentColor = if (enabled) FirePlexColors.Text else Color(0xFF6D7784)
 
     Surface(
         modifier = Modifier
-            .size(if (focused) 178.dp else 164.dp)
+            .size(if (focused) 168.dp else 156.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable(enabled)
             .tvRemoteClick(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(90.dp),
         color = Color(0x33111820),
-        border = BorderStroke(if (focused) 4.dp else 2.dp, borderColor)
+        border = BorderStroke(if (focused) FirePlexDimens.FocusBorder else 2.dp, borderColor)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Text(icon, color = contentColor, fontSize = 54.sp, fontWeight = FontWeight.Light)
-            Text(label, color = contentColor, fontSize = 24.sp, fontWeight = FontWeight.Light)
+            Text(icon, color = contentColor, fontSize = 48.sp, fontWeight = FontWeight.Light)
+            Text(label, color = contentColor, fontSize = 21.sp, fontWeight = FontWeight.Light)
         }
     }
 }
@@ -61,13 +61,13 @@ fun LobbySmallButton(text: String, onClick: () -> Unit) {
             .focusable()
             .tvRemoteClick(onClick = onClick),
         shape = RoundedCornerShape(6.dp),
-        color = if (focused) Color(0xFF00E676) else Color.Transparent,
-        border = BorderStroke(1.dp, if (focused) Color(0xFF00E676) else Color.White)
+        color = if (focused) FirePlexColors.Accent else Color.Transparent,
+        border = BorderStroke(FirePlexDimens.ThinBorder, if (focused) FirePlexColors.Accent else Color.White)
     ) {
         Text(
             text,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-            color = if (focused) Color.Black else Color.White,
+            color = if (focused) Color.Black else FirePlexColors.Text,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold
         )
@@ -82,10 +82,10 @@ fun ContentSideRail(
     onOpenSettings: () -> Unit,
     onOpenUpdate: () -> Unit
 ) {
-    Card(modifier = Modifier.width(250.dp).fillMaxHeight(), colors = CardDefaults.cardColors(containerColor = Color(0xE6111820)), shape = RoundedCornerShape(8.dp)) {
+    Card(modifier = Modifier.width(250.dp).fillMaxHeight(), colors = CardDefaults.cardColors(containerColor = FirePlexColors.Panel), shape = RoundedCornerShape(FirePlexDimens.CardRadius)) {
         LazyColumn(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            item { Text(title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold) }
-            item { Text("Categories", color = Color(0xFF00E676), fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+            item { Text(title, color = FirePlexColors.Text, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
+            item { Text("Categories", color = FirePlexColors.Accent, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
             item { MenuButton("Recently Added") { } }
             items(libraries, key = { it.key }) { library ->
                 MenuButton(library.title.ifBlank { "Library" }) { onOpenLibrary(library) }
@@ -100,14 +100,14 @@ fun ContentSideRail(
 @Composable
 fun ModeChip(text: String, selected: Boolean) {
     Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = if (selected) Color(0xFF00E676) else Color(0x66111820),
-        border = BorderStroke(1.dp, if (selected) Color(0xFF00E676) else Color(0x99FFFFFF))
+        shape = RoundedCornerShape(FirePlexDimens.ButtonRadius),
+        color = if (selected) FirePlexColors.Accent else Color(0x66111820),
+        border = BorderStroke(FirePlexDimens.ThinBorder, if (selected) FirePlexColors.Accent else Color(0x99FFFFFF))
     ) {
         Text(
             text,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp),
-            color = if (selected) Color.Black else Color.White,
+            color = if (selected) Color.Black else FirePlexColors.Text,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold
         )
@@ -120,14 +120,14 @@ fun UpdateStatusTile(title: String, status: String, modifier: Modifier = Modifie
         "completed" -> Color(0xFF4DFF9B)
         "updating..." -> Color(0xFF74F3F0)
         "failed" -> Color(0xFFFF6B6B)
-        else -> Color.White
+        else -> FirePlexColors.Text
     }
 
-    Card(modifier = modifier.height(126.dp), colors = CardDefaults.cardColors(containerColor = Color(0xC9111820)), shape = RoundedCornerShape(4.dp)) {
+    Card(modifier = modifier.height(110.dp), colors = CardDefaults.cardColors(containerColor = FirePlexColors.PanelSoft), shape = RoundedCornerShape(FirePlexDimens.CardRadius)) {
         Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Text(title, color = Color(0xFFBFEFF2), fontSize = 26.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(14.dp))
-            Text(status, color = statusColor, fontSize = 22.sp)
+            Text(title, color = Color(0xFFBFEFF2), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(10.dp))
+            Text(status, color = statusColor, fontSize = 19.sp)
         }
     }
 }
@@ -140,15 +140,15 @@ fun LeftMenu(
     onOpenSettings: () -> Unit,
     onRefresh: () -> Unit
 ) {
-    Card(modifier = Modifier.width(230.dp).fillMaxHeight(), colors = CardDefaults.cardColors(containerColor = Color(0xF2111820)), shape = RoundedCornerShape(18.dp)) {
+    Card(modifier = Modifier.width(230.dp).fillMaxHeight(), colors = CardDefaults.cardColors(containerColor = FirePlexColors.Panel), shape = RoundedCornerShape(FirePlexDimens.PanelRadius)) {
         LazyColumn(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            item { Text("Menu", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+            item { Text("Menu", color = FirePlexColors.Text, fontSize = 23.sp, fontWeight = FontWeight.Bold) }
             item { MenuButton("Hide Menu", onToggleMenu) }
             item { MenuButton("Refresh", onRefresh) }
             item { MenuButton("Settings", onOpenSettings) }
             item {
                 Spacer(Modifier.height(8.dp))
-                Text("Categories", color = Color(0xFF00E676), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Categories", color = FirePlexColors.Accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
             items(libraries, key = { it.key }) { library ->
                 MenuButton(library.title.ifBlank { "Library" }) { onOpenLibrary(library) }
@@ -160,19 +160,19 @@ fun LeftMenu(
 @Composable
 fun MenuButton(text: String, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
-    val bg = if (focused) Color(0x3329D3FF) else Color.Transparent
-    val fg = if (focused) Color(0xFF00E676) else Color.White
+    val bg = if (focused) FirePlexColors.Accent else Color.Transparent
+    val fg = if (focused) Color.Black else FirePlexColors.Text
 
     Text(
         text = text,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(FirePlexDimens.ButtonRadius))
             .background(bg)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .tvRemoteClick(onClick = onClick)
-            .padding(10.dp),
+            .padding(horizontal = 10.dp, vertical = 9.dp),
         color = fg,
         fontSize = 15.sp,
         fontWeight = if (focused) FontWeight.Bold else FontWeight.Normal,
@@ -201,28 +201,33 @@ fun FocusActionButton(text: String, modifier: Modifier = Modifier, color: Color,
     val label = text.uppercase()
     val isCancelAction = listOf("CANCEL", "BACK", "CLOSE", "RESET", "CLEAR", "SIGN OUT", "REMOVE", "DELETE", "EXIT").any { label.contains(it) }
     val normalColor = color
-    val focusedColor = if (isCancelAction) Color(0xFFFFB000) else Color(0xFF00FF66)
+    val focusedColor = if (isCancelAction) FirePlexColors.Gold else FirePlexColors.AccentBright
 
     Surface(
         modifier = modifier
-            .height(if (focused) 56.dp else 52.dp)
+            .height(if (focused) 52.dp else 48.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .tvRemoteClick(onClick = onClick),
         color = if (focused) focusedColor else normalColor,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(if (focused) 4.dp else 1.dp, if (focused) Color.White else Color(0x55566678))
+        shape = RoundedCornerShape(FirePlexDimens.ButtonRadius),
+        border = BorderStroke(if (focused) FirePlexDimens.FocusBorder else FirePlexDimens.ThinBorder, if (focused) Color.White else FirePlexColors.BorderStrong)
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(text, color = if (focused) Color.Black else Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+            Text(text, color = if (focused) Color.Black else FirePlexColors.Text, fontSize = 15.sp, fontWeight = FontWeight.Black)
         }
     }
 }
 
 @Composable
 fun EmptyPanel(text: String) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xF2111820)), shape = RoundedCornerShape(16.dp)) {
-        Text(text = text, modifier = Modifier.padding(18.dp), color = Color(0xFFB7C7D8), textAlign = TextAlign.Center)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = FirePlexColors.Panel),
+        shape = RoundedCornerShape(FirePlexDimens.CardRadius),
+        border = BorderStroke(FirePlexDimens.ThinBorder, FirePlexColors.Border)
+    ) {
+        Text(text = text, modifier = Modifier.padding(16.dp), color = FirePlexColors.Muted, textAlign = TextAlign.Center)
     }
 }
 
@@ -232,25 +237,26 @@ fun LibraryPosterCard(library: PlexLibrary, onOpen: () -> Unit) {
 
     Card(
         modifier = Modifier
-            .width(if (focused) 178.dp else 170.dp)
-            .height(if (focused) 240.dp else 230.dp)
+            .width(if (focused) 166.dp else 158.dp)
+            .height(if (focused) 224.dp else 214.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onOpen() },
-        colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF17222D) else Color(0xF2111820)),
-        border = if (focused) BorderStroke(3.dp, Color(0xFF00E676)) else null,
-        shape = RoundedCornerShape(18.dp)
+            .tvRemoteClick(onClick = onOpen),
+        colors = CardDefaults.cardColors(containerColor = if (focused) FirePlexColors.PanelFocused else FirePlexColors.Panel),
+        border = if (focused) BorderStroke(FirePlexDimens.FocusBorder, FirePlexColors.Accent) else BorderStroke(FirePlexDimens.ThinBorder, FirePlexColors.Border),
+        shape = RoundedCornerShape(FirePlexDimens.CardRadius)
     ) {
         Column(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF4A3208), Color(0xFF111820), Color(0xFF050608)))).padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Column {
-                Text(library.title.ifBlank { "Library" }, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(library.title.ifBlank { "Library" }, color = FirePlexColors.Text, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(6.dp))
-                Text(library.type.ifBlank { "category" }, color = Color(0xFF00E676), fontSize = 12.sp)
+                Text(library.type.ifBlank { "category" }, color = FirePlexColors.Accent, fontSize = 12.sp)
             }
-            Text(if (focused) "Press OK" else "Open", color = Color(0xFF00E676), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(if (focused) "Press OK" else "Open", color = FirePlexColors.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
+
 @Composable
 fun MediaWideRow(item: PlexMediaItem, artworkUrl: String, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
@@ -259,35 +265,36 @@ fun MediaWideRow(item: PlexMediaItem, artworkUrl: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
-            .focusable(),
-        colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF17222D) else Color(0xF2111820)),
-        border = if (focused) BorderStroke(3.dp, Color(0xFF00E676)) else null,
-        shape = RoundedCornerShape(18.dp)
+            .focusable()
+            .tvRemoteClick(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = if (focused) FirePlexColors.PanelFocused else FirePlexColors.Panel),
+        border = if (focused) BorderStroke(FirePlexDimens.FocusBorder, FirePlexColors.Accent) else BorderStroke(FirePlexDimens.ThinBorder, FirePlexColors.Border),
+        shape = RoundedCornerShape(FirePlexDimens.CardRadius)
     ) {
-        Row(modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(if (focused) 18.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(width = 116.dp, height = 78.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF1A2028)), contentAlignment = Alignment.Center) {
+        Row(modifier = Modifier.fillMaxWidth().padding(if (focused) 16.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(width = 106.dp, height = 70.dp).clip(RoundedCornerShape(FirePlexDimens.CardRadius)).background(Color(0xFF1A2028)), contentAlignment = Alignment.Center) {
                 if (artworkUrl.isNotBlank()) {
                     AsyncImage(model = cachedImageModel(artworkUrl), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
-                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = Color(0xFF00E676), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = FirePlexColors.Accent, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(item.title.ifBlank { "Untitled" }, color = Color.White, fontSize = if (focused) 21.sp else 19.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(mediaMetaLine(item), color = Color(0xFF00E676), fontSize = 13.sp)
+                Text(item.title.ifBlank { "Untitled" }, color = FirePlexColors.Text, fontSize = if (focused) 20.sp else 18.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(mediaMetaLine(item), color = FirePlexColors.Accent, fontSize = 12.sp)
 
                 if (item.summary.isNotBlank()) {
                     Spacer(Modifier.height(5.dp))
-                    Text(item.summary, color = Color(0xFFB7C7D8), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(item.summary, color = FirePlexColors.Muted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
 
             if (focused) {
                 Spacer(Modifier.width(12.dp))
-                Text("OK", color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.background(Color(0xFF00E676), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp))
+                Text("OK", color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.background(FirePlexColors.Accent, RoundedCornerShape(FirePlexDimens.ButtonRadius)).padding(horizontal = 12.dp, vertical = 6.dp))
             }
         }
     }

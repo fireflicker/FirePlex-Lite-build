@@ -95,12 +95,12 @@ fun SettingsScreen(
         page = SettingsPage.Main
     }
 
-    Row(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+    Row(modifier = Modifier.fillMaxSize().padding(FirePlexDimens.ScreenPadding)) {
         Column(
             modifier = Modifier
                 .width(68.dp)
                 .fillMaxHeight()
-                .background(Color(0xE807111B), RoundedCornerShape(8.dp))
+                .background(FirePlexColors.Panel, RoundedCornerShape(FirePlexDimens.CardRadius))
                 .padding(vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -120,7 +120,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .background(Color(0xC9050B11), RoundedCornerShape(8.dp))
+                .background(Color(0xC9050B11), RoundedCornerShape(FirePlexDimens.CardRadius))
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -137,9 +137,9 @@ fun SettingsScreen(
                                 SettingsPage.SpeedTest -> "PLEX TEST PING"
                             },
                             color = Color.White,
-                            fontSize = 36.sp,
+                            fontSize = 30.sp,
                             fontWeight = FontWeight.Light,
-                            letterSpacing = 8.sp
+                            letterSpacing = 5.sp
                         )
                         Text(status, color = Color(0xFF00E676), fontSize = 14.sp)
                         Text(cacheLabel(cachedAt), color = Color(0xFFB7C7D8), fontSize = 12.sp)
@@ -335,12 +335,12 @@ fun SettingsRailButton(text: String, selected: Boolean, onClick: () -> Unit) {
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .tvRemoteClick(onClick = onClick),
-        color = if (focused || selected) Color(0xFF00D74B) else Color.Transparent,
-        shape = RoundedCornerShape(7.dp),
-        border = if (focused) BorderStroke(2.dp, Color(0xFF8CFFAA)) else null
+        color = if (focused || selected) FirePlexColors.Accent else Color.Transparent,
+        shape = RoundedCornerShape(FirePlexDimens.CardRadius),
+        border = if (focused) BorderStroke(2.dp, FirePlexColors.AccentSoft) else null
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(text, color = if (focused) Color.Black else Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
+            Text(text, color = if (focused || selected) Color.Black else FirePlexColors.Text, fontSize = 8.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
         }
     }
 }
@@ -351,21 +351,21 @@ fun SettingsMenuRow(title: String, subtitle: String, onClick: () -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(58.dp)
+            .height(54.dp)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .tvRemoteClick(onClick = onClick),
-        color = if (focused) Color(0xFF00D74B) else Color(0xFF111A24),
-        shape = RoundedCornerShape(6.dp),
-        border = BorderStroke(1.dp, if (focused) Color(0xFF8CFFAA) else Color(0xFF273542))
+        color = if (focused) FirePlexColors.Accent else Color(0xFF111A24),
+        shape = RoundedCornerShape(FirePlexDimens.ButtonRadius),
+        border = BorderStroke(FirePlexDimens.ThinBorder, if (focused) FirePlexColors.AccentSoft else Color(0xFF273542))
     ) {
         Row(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(30.dp).background(if (focused) Color(0x22000000) else Color(0xFF182632), RoundedCornerShape(5.dp)), contentAlignment = Alignment.Center) {
-                Text("+", color = if (focused) Color.Black else Color(0xFF00FF66), fontWeight = FontWeight.Black)
+                Text("+", color = if (focused) Color.Black else FirePlexColors.AccentBright, fontWeight = FontWeight.Black)
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, color = if (focused) Color.Black else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(title, color = if (focused) Color.Black else FirePlexColors.Text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Text(subtitle, color = if (focused) Color(0xFF073A18) else Color(0xFF94A2B1), fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text(">", color = if (focused) Color.Black else Color(0xFF8EA0B1), fontSize = 18.sp)
@@ -386,7 +386,7 @@ fun SettingsAboutPanel(
         modifier = Modifier
             .width(260.dp)
             .heightIn(min = 390.dp)
-            .background(Color(0xFF0C151E), RoundedCornerShape(8.dp))
+            .background(Color(0xFF0C151E), RoundedCornerShape(FirePlexDimens.CardRadius))
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -460,9 +460,9 @@ fun SettingsTile(title: String, icon: String, modifier: Modifier = Modifier, onC
 
 @Composable
 fun SettingsCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xF2111820)), shape = RoundedCornerShape(18.dp)) {
-        Column(Modifier.padding(18.dp)) {
-            Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = FirePlexColors.Panel), shape = RoundedCornerShape(FirePlexDimens.CardRadius)) {
+        Column(Modifier.padding(16.dp)) {
+            Text(title, color = FirePlexColors.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
             content()
         }
@@ -489,10 +489,10 @@ fun SettingsExpandRow(open: Boolean, onToggle: () -> Unit) {
             .fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onToggle() },
-        color = if (focused) Color(0xFF203040) else Color(0x99111820),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFF00FF66) else Color(0x334B5C70))
+            .tvRemoteClick(onClick = onToggle),
+        color = if (focused) FirePlexColors.ButtonAlt else Color(0x99111820),
+        shape = RoundedCornerShape(FirePlexDimens.ButtonRadius),
+        border = BorderStroke(if (focused) FirePlexDimens.FocusBorder else FirePlexDimens.ThinBorder, if (focused) FirePlexColors.AccentBright else Color(0x334B5C70))
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
@@ -500,7 +500,7 @@ fun SettingsExpandRow(open: Boolean, onToggle: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(if (open) "Close section" else "Open section", color = if (focused) Color.White else Color(0xFFB7C7D8), fontSize = 15.sp, fontWeight = if (focused) FontWeight.Bold else FontWeight.Normal)
-            Text(if (open) "Hide" else "Show", color = if (focused) Color.Black else Color(0xFF00FF66), fontWeight = FontWeight.Black, modifier = if (focused) Modifier.background(Color(0xFF00FF66), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 5.dp) else Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
+            Text(if (open) "Hide" else "Show", color = if (focused) Color.Black else FirePlexColors.AccentBright, fontWeight = FontWeight.Black, modifier = if (focused) Modifier.background(FirePlexColors.AccentBright, RoundedCornerShape(FirePlexDimens.ButtonRadius)).padding(horizontal = 12.dp, vertical = 5.dp) else Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
         }
     }
 }
@@ -516,14 +516,14 @@ fun SettingsToggleRow(title: String, subtitle: String, checked: Boolean, onClick
             .focusable()
             .tvRemoteClick(onClick = onClick),
         color = if (focused) Color(0xFF203040) else Color(0x66111820),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFF00FF66) else Color(0x22384758))
+        shape = RoundedCornerShape(FirePlexDimens.ButtonRadius),
+        border = BorderStroke(if (focused) FirePlexDimens.FocusBorder else FirePlexDimens.ThinBorder, if (focused) FirePlexColors.AccentBright else Color(0x22384758))
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(28.dp)
-                    .background(if (checked) Color(0xFF00FF66) else Color.Transparent, RoundedCornerShape(6.dp)),
+                    .background(if (checked) FirePlexColors.AccentBright else Color.Transparent, RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(if (checked) "ON" else "", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 10.sp)
@@ -531,10 +531,10 @@ fun SettingsToggleRow(title: String, subtitle: String, checked: Boolean, onClick
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, color = Color.White, fontSize = 17.sp, fontWeight = if (focused) FontWeight.Black else FontWeight.Bold)
-                Text(subtitle, color = if (focused) Color(0xFF00FF66) else Color(0xFFB7C7D8), fontSize = 12.sp)
+                Text(subtitle, color = if (focused) FirePlexColors.AccentBright else FirePlexColors.Muted, fontSize = 12.sp)
             }
             if (focused) {
-                Text("OK", color = Color.Black, fontWeight = FontWeight.Black, modifier = Modifier.background(Color(0xFF00FF66), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 5.dp))
+                Text("OK", color = Color.Black, fontWeight = FontWeight.Black, modifier = Modifier.background(FirePlexColors.AccentBright, RoundedCornerShape(FirePlexDimens.ButtonRadius)).padding(horizontal = 12.dp, vertical = 5.dp))
             }
         }
     }
@@ -555,8 +555,8 @@ fun FocusOptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
             selected -> Color(0xFF2A3442)
             else -> Color(0xFF151C27)
         },
-        shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(if (focused) 3.dp else 1.dp, if (focused) Color(0xFF00FF66) else if (selected) Color(0xFF5D7188) else Color(0x44566678))
+        shape = RoundedCornerShape(FirePlexDimens.ButtonRadius),
+        border = BorderStroke(if (focused) FirePlexDimens.FocusBorder else FirePlexDimens.ThinBorder, if (focused) FirePlexColors.AccentBright else if (selected) Color(0xFF5D7188) else Color(0x44566678))
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp)) {
             Text(text, color = if (focused) Color.Black else Color.White, fontSize = 14.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal)

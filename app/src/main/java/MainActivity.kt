@@ -230,8 +230,9 @@ fun FirePlexApp(repo: PlexRepository) {
         val wallDelta = now - lastPlaybackReportWallMs
         val terminalState = normalizedState == "paused" || normalizedState == "stopped"
 
-        if (!itemChanged && !stateChanged && positionDelta < 1_000L) return
-        if (!itemChanged && !stateChanged && normalizedState == "playing" && wallDelta < 15_000L && positionDelta < 15_000L) return
+        if (!itemChanged && !stateChanged && positionDelta < 1_500L) return
+        if (!itemChanged && !stateChanged && normalizedState == "playing" && wallDelta < 30_000L && positionDelta < 30_000L) return
+        if (!itemChanged && normalizedState == "paused" && !stateChanged && wallDelta < 30_000L) return
         if (!itemChanged && !terminalState && normalizedState != "playing") return
 
         lastPlaybackReportKey = reportKey

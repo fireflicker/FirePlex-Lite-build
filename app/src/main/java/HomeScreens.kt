@@ -63,28 +63,28 @@ fun AppLoginScreen(
 ) {
     val nameFocus = rememberInitialFocusRequester()
     Column(
-        modifier = Modifier.fillMaxSize().padding(top = 18.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
+        verticalArrangement = Arrangement.Center
     ) {
         Image(
             painter = painterResource(id = R.drawable.app_logo),
             contentDescription = "FirePlex logo",
-            modifier = Modifier.size(78.dp),
+            modifier = Modifier.size(70.dp),
             contentScale = ContentScale.Fit
         )
         Spacer(Modifier.height(8.dp))
-        Text("FirePlex3.0", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("FirePlex3.0", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Text("Player account", color = Color(0xFF00E676), fontSize = 16.sp)
         Spacer(Modifier.height(16.dp))
 
         Card(
             modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xF2111820)),
-            shape = RoundedCornerShape(24.dp)
+            colors = CardDefaults.cardColors(containerColor = FirePlexColors.Panel),
+            shape = RoundedCornerShape(FirePlexDimens.PanelRadius)
         ) {
             Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Enter player name", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                Text("Enter player name", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(10.dp))
                 Text(
                     "Use the username from your FirePlex web panel. This also becomes the friendly name shown to Plex.",
@@ -145,28 +145,28 @@ fun LinkScreen(
     val generateFocus = rememberInitialFocusRequester()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(top = 18.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
+        verticalArrangement = Arrangement.Center
     ) {
         Image(
             painter = painterResource(id = R.drawable.app_logo),
             contentDescription = "FirePlex logo",
-            modifier = Modifier.size(78.dp),
+            modifier = Modifier.size(70.dp),
             contentScale = ContentScale.Fit
         )
         Spacer(Modifier.height(8.dp))
-        Text("FirePlex3.0", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("FirePlex3.0", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White)
         Text("Your Plex player", color = Color(0xFF00E676), fontSize = 16.sp)
         Spacer(Modifier.height(16.dp))
 
-        Card(modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xF2111820)), shape = RoundedCornerShape(24.dp)) {
+        Card(modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = FirePlexColors.Panel), shape = RoundedCornerShape(FirePlexDimens.PanelRadius)) {
             Column(Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Go to plex.tv/link", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                Text("Go to plex.tv/link", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(14.dp))
 
-                Box(modifier = Modifier.background(Color(0xFF1A2028), RoundedCornerShape(18.dp)).padding(horizontal = 36.dp, vertical = 18.dp), contentAlignment = Alignment.Center) {
-                    Text(text = codeText.ifBlank { "----" }, color = Color(0xFF00E676), fontSize = 44.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 6.sp)
+                Box(modifier = Modifier.background(Color(0xFF1A2028), RoundedCornerShape(FirePlexDimens.PanelRadius)).padding(horizontal = 34.dp, vertical = 16.dp), contentAlignment = Alignment.Center) {
+                    Text(text = codeText.ifBlank { "----" }, color = Color(0xFF00E676), fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 5.sp)
                 }
 
                 Spacer(Modifier.height(12.dp))

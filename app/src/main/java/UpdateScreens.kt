@@ -33,9 +33,9 @@ fun UpdateContentsScreen(
         runCatching { if (backReady) backFocus.requestFocus() else startFocus.requestFocus() }
     }
 
-    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Update Media Contents", color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.Light, letterSpacing = 6.sp)
-        Spacer(Modifier.height(28.dp))
+    Column(modifier = Modifier.fillMaxSize().padding(FirePlexDimens.ScreenPadding), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("Update Media Contents", color = FirePlexColors.Text, fontSize = 32.sp, fontWeight = FontWeight.Light, letterSpacing = 4.sp)
+        Spacer(Modifier.height(22.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             UpdateStatusTile("MOVIES", vodStatus, Modifier.weight(1f))
@@ -43,17 +43,17 @@ fun UpdateContentsScreen(
             UpdateStatusTile("ARTWORK", artworkStatus, Modifier.weight(1f))
         }
 
-        Spacer(Modifier.height(38.dp))
+        Spacer(Modifier.height(32.dp))
         if (loading) {
             CircularProgressIndicator(color = Color(0xFF74F3F0))
             Spacer(Modifier.height(18.dp))
-            Text("Please wait...", color = Color.White, fontSize = 26.sp)
+            Text("Please wait...", color = FirePlexColors.Text, fontSize = 23.sp)
         } else {
-            Text(status, color = Color(0xFFB7C7D8), fontSize = 17.sp, textAlign = TextAlign.Center)
+            Text(status, color = FirePlexColors.Muted, fontSize = 16.sp, textAlign = TextAlign.Center)
         }
 
         Spacer(Modifier.weight(1f))
-        Text(cacheLabel(cachedAt), color = Color(0xFF00E676), fontSize = 13.sp)
+        Text(cacheLabel(cachedAt), color = FirePlexColors.Accent, fontSize = 13.sp)
         Spacer(Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             FocusActionButton("CLEAR CACHE", Modifier.weight(1f), Color(0xFF5D1726)) { if (!loading) onClearCache() }

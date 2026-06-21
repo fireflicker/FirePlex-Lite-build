@@ -332,10 +332,10 @@ fun TopBar(
 
 @Composable
 fun HeroPanel(status: String) {
-    Card(modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp), colors = CardDefaults.cardColors(containerColor = Color(0xF2111820)), shape = RoundedCornerShape(24.dp)) {
-        Box(modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Color(0xFF31220A), Color(0xFF111820), Color(0xFF050608)))).padding(24.dp)) {
+    Card(modifier = Modifier.fillMaxWidth().heightIn(min = 150.dp), colors = CardDefaults.cardColors(containerColor = FirePlexColors.Panel), shape = RoundedCornerShape(FirePlexDimens.CardRadius)) {
+        Box(modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Color(0xFF31220A), Color(0xFF111820), Color(0xFF050608)))).padding(20.dp)) {
             Column {
-                Text("Home", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                Text("Home", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 Text(status, color = Color(0xFFD7DEE8), fontSize = 15.sp)
             }
@@ -400,8 +400,8 @@ fun MediaPosterCard(
     onLongClick: () -> Unit = {}
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scaleWidth = if (focused) 124.dp else 116.dp
-    val scaleHeight = if (focused) 186.dp else 176.dp
+    val scaleWidth = if (focused) 120.dp else 112.dp
+    val scaleHeight = if (focused) 180.dp else 170.dp
 
     Card(
         modifier = Modifier
@@ -409,32 +409,31 @@ fun MediaPosterCard(
             .height(scaleHeight)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .tvRemoteClick(onClick = onClick, onLongClick = onLongClick)
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = if (focused) Color(0xFF17222D) else Color(0xF2111820)),
-        border = if (focused) BorderStroke(3.dp, Color(0xFF00E676)) else null,
-        shape = RoundedCornerShape(10.dp)
+            .tvRemoteClick(onClick = onClick, onLongClick = onLongClick),
+        colors = CardDefaults.cardColors(containerColor = if (focused) FirePlexColors.PanelFocused else FirePlexColors.Panel),
+        border = if (focused) BorderStroke(FirePlexDimens.FocusBorder, FirePlexColors.Accent) else BorderStroke(FirePlexDimens.ThinBorder, FirePlexColors.Border),
+        shape = RoundedCornerShape(FirePlexDimens.CardRadius)
     ) {
         Column {
-            Box(modifier = Modifier.fillMaxWidth().height(116.dp).background(Color(0xFF1A2028)), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxWidth().height(110.dp).background(Color(0xFF1A2028)), contentAlignment = Alignment.Center) {
                 if (artworkUrl.isNotBlank()) {
                     AsyncImage(model = cachedImageModel(artworkUrl), contentDescription = item.title, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
-                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = Color(0xFF00E676), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text(item.type.take(1).uppercase().ifBlank { "V" }, color = FirePlexColors.Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
                 if (isFavorite) {
                     Text(
                         "â˜…",
                         modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
-                        color = Color(0xFF00E676),
+                        color = FirePlexColors.Accent,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
             Column(Modifier.padding(7.dp)) {
-                Text(item.title.ifBlank { "Untitled" }, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(mediaMetaLine(item), color = Color(0xFF00E676), fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.title.ifBlank { "Untitled" }, color = FirePlexColors.Text, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(mediaMetaLine(item), color = FirePlexColors.Accent, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
